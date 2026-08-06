@@ -93,16 +93,25 @@ the gap-map shows zero gaps.
 ### Goal 2 — A headless shell can invoke the Action API with zero GUI · serves: core value prop, "agentic/headless editing" workflow
 **Done when:** an external script/CLI can load a project, invoke Actions against it, and
 produce a valid, openable/exportable project — with no browser or desktop app involved.
-**Status:** todo, unblocked — Goal 1's Action API now has 69 registered Actions covering
-every editing/project operation identified in `GAP_MAP.md` except media import
-(paste/drag-drop), which 2a's contract design should account for directly rather than
-wait on.
+**Status:** in-progress — 2a done, 2b not started.
 **Sub-goals:**
-- [ ] **2a** Design the headless invocation contract — CLI vs. local server transport, how
+- [x] **2a** Design the headless invocation contract — CLI vs. local server transport, how
   a caller addresses a project and invokes an Action with args. Explicitly does NOT need to
   resolve the MCP-vs-REST open question from VISION.md yet — that's a Next-milestone
   decision — _advances:_ gives Goal 2 a concrete shape before building it — _accept:_ a
-  short written invocation contract.
+  short written invocation contract. **Done 2026-08-06 — see `HEADLESS_DESIGN.md`.**
+  Key findings: `EditorCore.getInstance()` already has no browser dependency at
+  construction (good news, wasn't obvious); the one confirmed blocker is
+  `StorageService` hardcoding `IndexedDBAdapter`/`OPFSAdapter`, fixable by adding
+  Node-backed adapters implementing the existing `StorageAdapter<T>` interface and
+  branching on environment, not a parallel storage layer. Transport decision: a
+  single-process script running an ordered `steps.json` of `{action, args}` calls against
+  one loaded project (not a CLI-per-Action-call — that would throw away the in-memory
+  undo/redo session Deriv8ion's per-command-process CLI pattern doesn't need to preserve
+  — and not a local server, since that's really the deferred MCP question). Flagged for
+  2b: `SaveManager`'s 800ms debounced auto-save means a one-shot script must explicitly
+  `save-project` and wait before exit; `RendererManager`/`AudioManager`/`toast` calls are
+  unverified outside a browser and need a smoke test, not an assumption either way.
 - [ ] **2b** Implement the headless shell as a new thin shell alongside `apps/web` and
   `apps/desktop`, calling the same Action layer Goal 1 completed — no parallel/duplicate
   logic — _advances:_ the Action-layer-stays-source-of-truth principle — _accept:_ the
