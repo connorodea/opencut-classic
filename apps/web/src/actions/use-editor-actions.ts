@@ -574,4 +574,71 @@ export function useEditorActions() {
 		},
 		undefined,
 	);
+
+	useActionHandler(
+		"add-clip-effect",
+		(args) => {
+			if (!args) return;
+			editor.timeline.addClipEffect({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				effectType: args.effectType,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"remove-clip-effect",
+		(args) => {
+			if (!args) return;
+			editor.timeline.removeClipEffect({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				effectId: args.effectId,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"toggle-clip-effect",
+		(args) => {
+			if (!args) return;
+			editor.timeline.toggleClipEffect({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				effectId: args.effectId,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"reorder-clip-effects",
+		(args) => {
+			if (!args) return;
+			editor.timeline.reorderClipEffects({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				fromIndex: args.fromIndex,
+				toIndex: args.toIndex,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-clip-effect-params",
+		(args) => {
+			if (!args) return;
+			editor.timeline.updateClipEffectParams({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				effectId: args.effectId,
+				params: args.params,
+			});
+		},
+		undefined,
+	);
 }

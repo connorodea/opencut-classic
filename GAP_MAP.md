@@ -5,7 +5,7 @@
 > invoked through `EditorCore`'s three managers — `TimelineManager`, `ScenesManager`,
 > `ProjectManager` — via a shared `CommandManager` with undo/redo).
 
-_Last updated: 2026-08-06 · v0.2_
+_Last updated: 2026-08-06 · v0.3_
 
 ## Architecture found
 
@@ -54,7 +54,7 @@ after the action resolves, same pattern as `export-project`'s `getExportState()`
 ### Tier 2 — whole subsystems with zero coverage
 | Subsystem | Manager methods with no Action | Impact |
 |---|---|---|
-| **Effects** | `addClipEffect`, `removeClipEffect`, `toggleClipEffect`, `reorderClipEffects`, `updateClipEffectParams` | Agent cannot apply, adjust, or remove any visual effect — a core DaVinci/CapCut-tier capability named in VISION.md. |
+| **Effects** — **closed** | ~~`addClipEffect`, `removeClipEffect`, `toggleClipEffect`, `reorderClipEffects`, `updateClipEffectParams`~~ → `add-clip-effect`, `remove-clip-effect`, `toggle-clip-effect`, `reorder-clip-effects`, `update-clip-effect-params` | Agent can now apply, adjust, reorder, toggle, and remove clip effects — the DaVinci/CapCut-tier capability named in VISION.md. |
 | **Keyframes/animation** | `upsertKeyframes`, `retimeKeyframe`, `updateKeyframeCurves`, `upsertEffectParamKeyframe`, `removeEffectParamKeyframe` | Agent cannot create or edit any animation — only `removeKeyframes` is reachable, and only via `delete-selected`'s keyframe-selection branch. |
 | **Masks** | `insertFreeformPathMaskPoint`, `removeMask`, `toggleMaskInverted` | Agent cannot create or configure a mask; `deleteFreeformPathMaskPoints` is reachable only via `delete-selected`'s mask-point-selection branch. |
 | **Scenes (CRUD)** | `createScene`, `deleteScene`, `renameScene`, `switchToScene` | Scenes are the project's structural unit; agent cannot create, remove, rename, or navigate between them — only `toggleBookmark` (a per-scene marker) has any Action coverage. |
@@ -102,10 +102,13 @@ pan) — per VISION.md's MVP boundary these are lower value for agent control an
 deliberately out of scope for Goal 1 unless a Goal 3 proof scenario surfaces a real need.
 
 ## Gap count
-34 registered Actions (30 original + 4 added closing Tier 1). ~38 manager-level mutating
-methods identified. ~17 now have Action coverage. **~21 methods still have zero Action
-coverage** — all of Tier 2 and Tier 3 below.
+39 registered Actions (30 original + 4 closing Tier 1 + 5 closing Tier 2's effects
+subsystem). ~38 manager-level mutating methods identified. ~22 now have Action coverage.
+**~16 methods still have zero Action coverage** — Tier 2's keyframes/masks/scenes/tracks/
+project-library-lifecycle subsystems, plus all of Tier 3.
 
 ## Next (1b)
-Tier 1 is closed. Continue in Tier 2 → Tier 3 order. Tier 2's highest-leverage subsystem
-is effects (DaVinci/CapCut-tier capability named directly in VISION.md) — start there.
+Tier 1 closed. Tier 2's effects subsystem closed. Continue through Tier 2's remaining
+subsystems (keyframes/animation is the next highest-leverage — same DaVinci/CapCut-tier
+capability class as effects), then masks, scene CRUD, tracks, project-library lifecycle,
+then Tier 3.

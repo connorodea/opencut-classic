@@ -2,6 +2,7 @@ import type { MutableRefObject } from "react";
 import type { FrameRate } from "opencut-wasm";
 import type { ExportFormat, ExportQuality } from "@/export";
 import type { TProjectSettings } from "@/project/types";
+import type { ParamValues } from "@/params";
 import type { TAction } from "./definitions";
 
 export type { TAction };
@@ -22,6 +23,25 @@ export type TActionArgsMap = {
 	"create-project": { name: string };
 	"load-project": { id: string };
 	"update-project-settings": { settings: Partial<TProjectSettings> };
+	"add-clip-effect": {
+		trackId: string;
+		elementId: string;
+		effectType: string;
+	};
+	"remove-clip-effect": { trackId: string; elementId: string; effectId: string };
+	"toggle-clip-effect": { trackId: string; elementId: string; effectId: string };
+	"reorder-clip-effects": {
+		trackId: string;
+		elementId: string;
+		fromIndex: number;
+		toIndex: number;
+	};
+	"update-clip-effect-params": {
+		trackId: string;
+		elementId: string;
+		effectId: string;
+		params: Partial<ParamValues>;
+	};
 };
 
 type TKeysWithValueUndefined<T> = {

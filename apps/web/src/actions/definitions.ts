@@ -10,7 +10,8 @@ export type TActionCategory =
 	| "timeline"
 	| "controls"
 	| "assets"
-	| "project";
+	| "project"
+	| "effects";
 
 export interface TActionBaseDefinition {
 	description: string;
@@ -177,6 +178,41 @@ export const ACTIONS = {
 		description: "Update the active project's settings (fps, canvas size, background, etc.)",
 		category: "project",
 		args: { settings: "object" },
+	},
+	"add-clip-effect": {
+		description: "Add an effect to a clip",
+		category: "effects",
+		args: { trackId: "string", elementId: "string", effectType: "string" },
+	},
+	"remove-clip-effect": {
+		description: "Remove an effect from a clip",
+		category: "effects",
+		args: { trackId: "string", elementId: "string", effectId: "string" },
+	},
+	"toggle-clip-effect": {
+		description: "Enable/disable an effect on a clip",
+		category: "effects",
+		args: { trackId: "string", elementId: "string", effectId: "string" },
+	},
+	"reorder-clip-effects": {
+		description: "Change the order of an effect in a clip's effect stack",
+		category: "effects",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			fromIndex: "number",
+			toIndex: "number",
+		},
+	},
+	"update-clip-effect-params": {
+		description: "Update an effect's parameter values on a clip",
+		category: "effects",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			effectId: "string",
+			params: "object",
+		},
 	},
 } as const satisfies Record<string, TActionBaseDefinition>;
 
