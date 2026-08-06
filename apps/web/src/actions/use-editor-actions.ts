@@ -26,7 +26,7 @@ import {
 	type ScopeEntry,
 } from "@/selection/scope";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
-import { insertCaptionChunksAsTextTrack } from "@/subtitles/insert";
+import * as handlers from "@/actions/handlers";
 
 export function useEditorActions() {
 	const editor = useEditor();
@@ -527,14 +527,7 @@ export function useEditorActions() {
 			// editor.project.getExportState(), same as the export UI does —
 			// keeps this handler's signature consistent with every other
 			// action handler (void, not a returned Promise).
-			void editor.project.export({
-				options: {
-					format: args.format,
-					quality: args.quality,
-					fps: args.fps,
-					includeAudio: args.includeAudio,
-				},
-			});
+			handlers.exportProject(editor, args);
 		},
 		undefined,
 	);
@@ -545,7 +538,7 @@ export function useEditorActions() {
 			if (!args) return;
 			// Fire-and-forget, like export-project: the new project's id/state
 			// is observed via editor.project.getActive() after this resolves.
-			void editor.project.createNewProject({ name: args.name });
+			handlers.createProject(editor, args);
 		},
 		undefined,
 	);
@@ -554,7 +547,7 @@ export function useEditorActions() {
 		"load-project",
 		(args) => {
 			if (!args) return;
-			void editor.project.loadProject({ id: args.id });
+			handlers.loadProject(editor, args);
 		},
 		undefined,
 	);
@@ -562,7 +555,7 @@ export function useEditorActions() {
 	useActionHandler(
 		"save-project",
 		() => {
-			void editor.project.saveCurrentProject();
+			handlers.saveProject(editor);
 		},
 		undefined,
 	);
@@ -571,7 +564,7 @@ export function useEditorActions() {
 		"update-project-settings",
 		(args) => {
 			if (!args) return;
-			editor.project.updateSettings({ settings: args.settings });
+			handlers.updateProjectSettings(editor, args);
 		},
 		undefined,
 	);
@@ -580,11 +573,7 @@ export function useEditorActions() {
 		"add-clip-effect",
 		(args) => {
 			if (!args) return;
-			editor.timeline.addClipEffect({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				effectType: args.effectType,
-			});
+			handlers.addClipEffect(editor, args);
 		},
 		undefined,
 	);
@@ -593,11 +582,7 @@ export function useEditorActions() {
 		"remove-clip-effect",
 		(args) => {
 			if (!args) return;
-			editor.timeline.removeClipEffect({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				effectId: args.effectId,
-			});
+			handlers.removeClipEffect(editor, args);
 		},
 		undefined,
 	);
@@ -606,11 +591,7 @@ export function useEditorActions() {
 		"toggle-clip-effect",
 		(args) => {
 			if (!args) return;
-			editor.timeline.toggleClipEffect({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				effectId: args.effectId,
-			});
+			handlers.toggleClipEffect(editor, args);
 		},
 		undefined,
 	);
@@ -619,12 +600,7 @@ export function useEditorActions() {
 		"reorder-clip-effects",
 		(args) => {
 			if (!args) return;
-			editor.timeline.reorderClipEffects({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				fromIndex: args.fromIndex,
-				toIndex: args.toIndex,
-			});
+			handlers.reorderClipEffects(editor, args);
 		},
 		undefined,
 	);
@@ -633,12 +609,7 @@ export function useEditorActions() {
 		"update-clip-effect-params",
 		(args) => {
 			if (!args) return;
-			editor.timeline.updateClipEffectParams({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				effectId: args.effectId,
-				params: args.params,
-			});
+			handlers.updateClipEffectParams(editor, args);
 		},
 		undefined,
 	);
@@ -647,7 +618,7 @@ export function useEditorActions() {
 		"upsert-keyframe",
 		(args) => {
 			if (!args) return;
-			editor.timeline.upsertKeyframes({ keyframes: [args] });
+			handlers.upsertKeyframe(editor, args);
 		},
 		undefined,
 	);
@@ -656,13 +627,7 @@ export function useEditorActions() {
 		"retime-keyframe",
 		(args) => {
 			if (!args) return;
-			editor.timeline.retimeKeyframe({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				propertyPath: args.propertyPath,
-				keyframeId: args.keyframeId,
-				time: args.time,
-			});
+			handlers.retimeKeyframe(editor, args);
 		},
 		undefined,
 	);
@@ -671,7 +636,7 @@ export function useEditorActions() {
 		"update-keyframe-curve",
 		(args) => {
 			if (!args) return;
-			editor.timeline.updateKeyframeCurves({ keyframes: [args] });
+			handlers.updateKeyframeCurve(editor, args);
 		},
 		undefined,
 	);
@@ -680,16 +645,7 @@ export function useEditorActions() {
 		"upsert-effect-param-keyframe",
 		(args) => {
 			if (!args) return;
-			editor.timeline.upsertEffectParamKeyframe({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				effectId: args.effectId,
-				paramKey: args.paramKey,
-				time: args.time,
-				value: args.value,
-				interpolation: args.interpolation,
-				keyframeId: args.keyframeId,
-			});
+			handlers.upsertEffectParamKeyframe(editor, args);
 		},
 		undefined,
 	);
@@ -698,13 +654,7 @@ export function useEditorActions() {
 		"remove-effect-param-keyframe",
 		(args) => {
 			if (!args) return;
-			editor.timeline.removeEffectParamKeyframe({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				effectId: args.effectId,
-				paramKey: args.paramKey,
-				keyframeId: args.keyframeId,
-			});
+			handlers.removeEffectParamKeyframe(editor, args);
 		},
 		undefined,
 	);
@@ -713,11 +663,7 @@ export function useEditorActions() {
 		"remove-mask",
 		(args) => {
 			if (!args) return;
-			editor.timeline.removeMask({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				maskId: args.maskId,
-			});
+			handlers.removeMask(editor, args);
 		},
 		undefined,
 	);
@@ -726,11 +672,7 @@ export function useEditorActions() {
 		"toggle-mask-inverted",
 		(args) => {
 			if (!args) return;
-			editor.timeline.toggleMaskInverted({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				maskId: args.maskId,
-			});
+			handlers.toggleMaskInverted(editor, args);
 		},
 		undefined,
 	);
@@ -739,14 +681,7 @@ export function useEditorActions() {
 		"insert-freeform-path-mask-point",
 		(args) => {
 			if (!args) return;
-			editor.timeline.insertFreeformPathMaskPoint({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				maskId: args.maskId,
-				segmentIndex: args.segmentIndex,
-				canvasPoint: args.canvasPoint,
-				bounds: args.bounds,
-			});
+			handlers.insertFreeformPathMaskPoint(editor, args);
 		},
 		undefined,
 	);
@@ -755,7 +690,7 @@ export function useEditorActions() {
 		"create-scene",
 		(args) => {
 			if (!args) return;
-			void editor.scenes.createScene({ name: args.name, isMain: args.isMain });
+			handlers.createScene(editor, args);
 		},
 		undefined,
 	);
@@ -764,7 +699,7 @@ export function useEditorActions() {
 		"delete-scene",
 		(args) => {
 			if (!args) return;
-			void editor.scenes.deleteScene({ sceneId: args.sceneId });
+			handlers.deleteScene(editor, args);
 		},
 		undefined,
 	);
@@ -773,7 +708,7 @@ export function useEditorActions() {
 		"rename-scene",
 		(args) => {
 			if (!args) return;
-			void editor.scenes.renameScene({ sceneId: args.sceneId, name: args.name });
+			handlers.renameScene(editor, args);
 		},
 		undefined,
 	);
@@ -782,7 +717,7 @@ export function useEditorActions() {
 		"switch-scene",
 		(args) => {
 			if (!args) return;
-			void editor.scenes.switchToScene({ sceneId: args.sceneId });
+			handlers.switchScene(editor, args);
 		},
 		undefined,
 	);
@@ -791,7 +726,7 @@ export function useEditorActions() {
 		"remove-bookmark",
 		(args) => {
 			if (!args) return;
-			void editor.scenes.removeBookmark({ time: args.time });
+			handlers.removeBookmark(editor, args);
 		},
 		undefined,
 	);
@@ -800,10 +735,7 @@ export function useEditorActions() {
 		"update-bookmark",
 		(args) => {
 			if (!args) return;
-			void editor.scenes.updateBookmark({
-				time: args.time,
-				updates: args.updates,
-			});
+			handlers.updateBookmark(editor, args);
 		},
 		undefined,
 	);
@@ -812,10 +744,7 @@ export function useEditorActions() {
 		"move-bookmark",
 		(args) => {
 			if (!args) return;
-			void editor.scenes.moveBookmark({
-				fromTime: args.fromTime,
-				toTime: args.toTime,
-			});
+			handlers.moveBookmark(editor, args);
 		},
 		undefined,
 	);
@@ -824,7 +753,7 @@ export function useEditorActions() {
 		"add-track",
 		(args) => {
 			if (!args) return;
-			editor.timeline.addTrack({ type: args.type, index: args.index });
+			handlers.addTrack(editor, args);
 		},
 		undefined,
 	);
@@ -833,7 +762,7 @@ export function useEditorActions() {
 		"remove-track",
 		(args) => {
 			if (!args) return;
-			editor.timeline.removeTrack({ trackId: args.trackId });
+			handlers.removeTrack(editor, args);
 		},
 		undefined,
 	);
@@ -842,7 +771,7 @@ export function useEditorActions() {
 		"toggle-track-mute",
 		(args) => {
 			if (!args) return;
-			editor.timeline.toggleTrackMute({ trackId: args.trackId });
+			handlers.toggleTrackMute(editor, args);
 		},
 		undefined,
 	);
@@ -851,7 +780,7 @@ export function useEditorActions() {
 		"toggle-track-visibility",
 		(args) => {
 			if (!args) return;
-			editor.timeline.toggleTrackVisibility({ trackId: args.trackId });
+			handlers.toggleTrackVisibility(editor, args);
 		},
 		undefined,
 	);
@@ -860,7 +789,7 @@ export function useEditorActions() {
 		"rename-project",
 		(args) => {
 			if (!args) return;
-			void editor.project.renameProject({ id: args.id, name: args.name });
+			handlers.renameProject(editor, args);
 		},
 		undefined,
 	);
@@ -869,7 +798,7 @@ export function useEditorActions() {
 		"duplicate-projects",
 		(args) => {
 			if (!args) return;
-			void editor.project.duplicateProjects({ ids: args.ids });
+			handlers.duplicateProjects(editor, args);
 		},
 		undefined,
 	);
@@ -878,7 +807,7 @@ export function useEditorActions() {
 		"delete-projects",
 		(args) => {
 			if (!args) return;
-			void editor.project.deleteProjects({ ids: args.ids });
+			handlers.deleteProjects(editor, args);
 		},
 		undefined,
 	);
@@ -887,7 +816,7 @@ export function useEditorActions() {
 		"update-project-thumbnail",
 		(args) => {
 			if (!args) return;
-			void editor.project.updateThumbnail({ thumbnail: args.thumbnail });
+			handlers.updateProjectThumbnail(editor, args);
 		},
 		undefined,
 	);
@@ -895,7 +824,7 @@ export function useEditorActions() {
 	useActionHandler(
 		"close-project",
 		() => {
-			editor.project.closeProject();
+			handlers.closeProject(editor);
 		},
 		undefined,
 	);
@@ -904,10 +833,7 @@ export function useEditorActions() {
 		"insert-element",
 		(args) => {
 			if (!args) return;
-			editor.timeline.insertElement({
-				element: args.element,
-				placement: args.placement,
-			});
+			handlers.insertElement(editor, args);
 		},
 		undefined,
 	);
@@ -916,14 +842,7 @@ export function useEditorActions() {
 		"update-element-trim",
 		(args) => {
 			if (!args) return;
-			editor.timeline.updateElementTrim({
-				elementId: args.elementId,
-				trimStart: args.trimStart,
-				trimEnd: args.trimEnd,
-				startTime: args.startTime,
-				duration: args.duration,
-				pushHistory: args.pushHistory,
-			});
+			handlers.updateElementTrim(editor, args);
 		},
 		undefined,
 	);
@@ -932,12 +851,7 @@ export function useEditorActions() {
 		"update-element-retime",
 		(args) => {
 			if (!args) return;
-			editor.timeline.updateElementRetime({
-				trackId: args.trackId,
-				elementId: args.elementId,
-				retime: args.retime,
-				pushHistory: args.pushHistory,
-			});
+			handlers.updateElementRetime(editor, args);
 		},
 		undefined,
 	);
@@ -946,10 +860,7 @@ export function useEditorActions() {
 		"move-elements",
 		(args) => {
 			if (!args) return;
-			editor.timeline.moveElements({
-				moves: args.moves,
-				createTracks: args.createTracks,
-			});
+			handlers.moveElements(editor, args);
 		},
 		undefined,
 	);
@@ -958,10 +869,7 @@ export function useEditorActions() {
 		"update-elements",
 		(args) => {
 			if (!args) return;
-			editor.timeline.updateElements({
-				updates: args.updates,
-				pushHistory: args.pushHistory,
-			});
+			handlers.updateElements(editor, args);
 		},
 		undefined,
 	);
@@ -970,7 +878,7 @@ export function useEditorActions() {
 		"insert-captions-as-text-track",
 		(args) => {
 			if (!args) return;
-			insertCaptionChunksAsTextTrack({ editor, captions: args.captions });
+			handlers.insertCaptionsAsTextTrack(editor, args);
 		},
 		undefined,
 	);

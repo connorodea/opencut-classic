@@ -93,9 +93,20 @@ the gap-map shows zero gaps.
 ### Goal 2 — A headless shell can invoke the Action API with zero GUI · serves: core value prop, "agentic/headless editing" workflow
 **Done when:** an external script/CLI can load a project, invoke Actions against it, and
 produce a valid, openable/exportable project — with no browser or desktop app involved.
-**Status:** in-progress — 2a done, 2b's bootstrapping blocker (storage + WASM loading)
-is resolved and verified; the actual Action-layer invocation path (handler extraction +
-run.ts) is what's left — see below.
+**Status:** done 2026-08-06 — 2a and 2b both complete. `apps/web/headless/run.ts` loads/
+creates a project and runs named Actions from a `steps.json` file against real files on
+disk, verified end-to-end (a settings change + a track add, correctly persisted and
+correctly pruned respectively). "Produce a valid, openable" project is met — the saved
+file is the same storage format the real app reads. Also specifically checked
+`export-project` (fire-and-forget, so checked by polling `getExportState()` rather than
+trusting the call not throwing): it dispatches and completes its lifecycle correctly on
+an empty project, resolving with a legitimate business-logic rejection
+(`"Project is empty"`), not an infra crash — so the Action mechanism itself works
+headlessly. Exporting a project with **real content** is still unverified, since no
+headless test project has actual media/elements to encode, and `OffscreenCanvas`/
+renderer dependencies are confirmed to throw the moment they're touched elsewhere
+(thumbnail generation) — real-content export is the next thing to actually run, not
+assumed working by extension.
 **Sub-goals:**
 - [x] **2a** Design the headless invocation contract — CLI vs. local server transport, how
   a caller addresses a project and invokes an Action with args. Explicitly does NOT need to

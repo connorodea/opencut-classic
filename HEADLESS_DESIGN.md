@@ -5,17 +5,16 @@
 > MCP-vs-REST (that's VISION.md's Next milestone) — this is the invocation contract
 > underneath whatever agent-facing protocol comes later.
 
-_2026-08-06 · v1.3 — **the bootstrapping blocker is resolved.** v1.1 found bare `bun
-run` breaks on WASM loading; v1.2 found the proposed Next.js-server-runtime fix breaks
-differently (a barrel-file/RSC issue); **v1.3 fixes the actual problem** — a
-custom Bun loader plugin for `opencut-wasm` (see the v1.3 section) — and
-`EditorCore.getInstance()` now genuinely runs headlessly under bare Bun: verified with a
-kept proof script (`apps/web/headless/bootstrap-proof.ts`) that creates a project,
-mutates it, saves, resets the in-memory singleton to simulate a fresh process, reloads
-from disk, and confirms the mutation survived. All three corrections are kept in order
-rather than collapsed into a clean-looking final state, since the false starts are part
-of the real record — same practice as every other correction in this document and in
-`GAP_MAP.md`._
+_2026-08-06 · v1.4 — **Goal 2b's actual accept criteria is now met, precisely as
+written**, not just its bootstrapping prerequisite. v1.1–v1.3 got `EditorCore` +
+persistence running headlessly at all; v1.4 extracts the Action-layer handlers into
+`apps/web/src/actions/handlers.ts` and adds `apps/web/headless/run.ts`, a real runner
+that loads/creates a project and executes an ordered `steps.json` of named Actions
+(`{"action": "update-project-settings", "args": {...}}`, not manager-method calls) —
+verified end-to-end against real files on disk, not asserted. All corrections kept in
+order rather than collapsed into a clean-looking final state, since the false starts are
+part of the real record — same practice as every other correction in this document and
+in `GAP_MAP.md`._
 
 ## What's actually being decided
 
@@ -313,28 +312,66 @@ positional-args bug in three more places, **left unfixed**: it's the legacy v1�
 migration path specifically, not reachable by any project created at the current
 version, and out of scope for this pass (still flagged in `tsc`'s output, unchanged).
 
-## Next (2b)
+## v1.4 — handler extraction + the real runner, accept criteria met
 
-Bootstrapping is done. What's left, in order: (1) extract `use-editor-actions.ts`'s
-handler bodies into plain functions callable from both the React hook and a headless
-runner — note this is **not** uniformly mechanical the way "thin one-liner into a
-manager method" suggested: the ~39 actions added while closing `GAP_MAP.md` are true
-thin wrappers with no React dependency, but a meaningful share of the original 30 close
-over React-only state (`selectedElements`, `selectedKeyframes`, scope-activation refs)
-that has no headless equivalent yet and needs real design work, not a mechanical move;
-(2) the `run.ts` entry point + `steps.json` schema validation, reusing the
-`--preload wasm-bindgen-bun-plugin.ts` pattern proven here; (3) smoke-test
-`RendererManager`/`AudioManager`/`toast` the way `OffscreenCanvas` was smoke-tested here
-(it throws, but the throw is already caught by `project-manager.ts`'s own try/catch
-around thumbnail generation — confirmed by the proof script's log output, not assumed);
-(4) decide whether to fix `v1-to-v2.ts`'s pre-existing positional-args bug now or leave
-it tracked. Accept criteria per GOALS.md 2b: the shell loads a real project, invokes at
-least one Action end-to-end, and persists the result correctly. **Not yet met — be
-precise about what the proof script actually shows.** It calls
-`editor.project.updateSettings(...)` — the manager method the `update-project-settings`
-Action wraps — directly, not through `invokeAction`/`useActionHandler`, which still
-requires a React tree per the existing wiring. What's proven is the prerequisite
-(`EditorCore` + persistence run headlessly at all, with a real save/reload round-trip);
-what's still missing is (1) and (2) above, the actual Action-layer invocation path. Don't
-conflate "the manager method works headlessly" with "the Action works headlessly" —
-they're not the same claim, and 2b's accept criteria is written in terms of the latter.
+**`apps/web/src/actions/handlers.ts`**: the ~39 thin-wrapper Actions closing
+`GAP_MAP.md` (everything from `export-project` through
+`insert-captions-as-text-track` in `use-editor-actions.ts`, confirmed by inspection to
+have zero closures over React-only state — no `selectedElements`, no refs, no scope
+activation) each became a standalone `(editor: EditorCore, args) => void` function,
+fully typed against `TActionArgsMap`. `use-editor-actions.ts` was rewritten to delegate
+into these same functions from inside each `useActionHandler(...)` call — a real DRY
+refactor, not an addition: the logic moved, it didn't duplicate. A loosely-typed
+`ACTION_HANDLERS: Record<string, (editor, args) => void>` dispatch table lives alongside
+the named exports, for the runner's dynamic string-keyed lookup (JSON-sourced action
+names aren't statically known, so this one boundary trades some type safety for the
+alternative — fighting a mapped type across a heterogeneous, partial set of Actions —
+which wasn't worth it).
+
+**`apps/web/headless/run.ts`**: `bun run --preload ./headless/wasm-bindgen-bun-plugin.ts
+headless/run.ts --project <id|new:Name> --steps <path>` loads or creates a project,
+runs each `{action, args}` step from the JSON file through `ACTION_HANDLERS[step.action]`
+— genuine Action-name dispatch, not a manager-method shortcut — and does an explicit
+final `saveCurrentProject()` regardless of whether the step list already ends in one
+(cheap insurance against `SaveManager`'s debounce, per the "auto-save timing" risk
+flagged back in v1.0).
+
+**Verified, not asserted** — `apps/web/headless/example-steps.json`
+(`update-project-settings` → `add-track` → `save-project`) run through `run.ts` against
+real files on disk: both steps executed via their actual Action names, the persisted
+project file has `settings.fps` correctly changed, and the added track is correctly
+absent (the empty-track-pruning reactor from v1.3's false-alarm section, working exactly
+as documented, not a regression). **Goal 2b's accept criteria is met as literally
+written**, with the earlier imprecision (manager-method call passed off as "an Action
+ran") actually corrected, not just re-asserted more confidently.
+
+Separately checked `export-project` specifically, since it's the highest-value Action
+and it's fire-and-forget (the handler doesn't await, matching the UI's own polling
+pattern) — trusting "the call didn't throw" wouldn't actually prove anything. Polled
+`editor.project.getExportState()` after dispatching it against an empty project: it
+transitions `isExporting: true` → `false` and resolves with `{success: false, error:
+"Project is empty"}` — a real, legitimate business-logic rejection, not an infra crash.
+So the Action's dispatch-and-lifecycle mechanism works headlessly. Exporting a project
+with **actual content** (real media/elements to encode) is still unverified — no
+headless test project has any — and is a real risk given `RendererManager`'s confirmed
+`OffscreenCanvas` dependency; that's the next thing to actually run, not infer from this.
+
+**What's still open, honestly:**
+- The original 30 Actions (playback, selection, clipboard, etc.) are not extracted —
+  they close over real React state with no headless equivalent designed yet. Running
+  those headlessly is future work, not needed for Goal 2b's own bar.
+- `RendererManager`/`AudioManager`/`toast` are confirmed to fail loudly the moment
+  they're touched (`OffscreenCanvas is not defined`, seen in every proof run) but are
+  already caught by existing try/catch in the code paths this session exercised — not
+  smoke-tested for every path, just the ones actually run.
+- `v1-to-v2.ts`'s pre-existing positional-args bug (3 spots) remains unfixed —
+  legacy-migration-only, still flagged by `tsc`, still out of scope for this pass.
+
+## Next
+
+Goal 2b is done. Goal 3 (the proof-gate: a real, non-toy scripted edit, human-approved
+as genuinely useful) is next per `GOALS.md`'s sequencing — and per its own explicit
+scope, that means picking a concrete edit scenario using only the ~39 headless-runnable
+Actions above (no playback/selection-dependent UI actions needed for a scripted,
+non-interactive edit), not extracting the remaining 30 first unless Goal 3's actual
+scenario turns out to need one of them.
