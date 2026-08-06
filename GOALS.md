@@ -34,8 +34,7 @@ list above, deferred to VISION.md's Next/Later milestones.
 **Done when:** every currently UI-triggerable operation in classic has a corresponding
 registered Action with typed args and a doc entry per the existing `docs/actions.md`
 pattern; no UI handler calls `editor.xxx()` directly, bypassing `invokeAction`.
-**Status:** in-progress (1a done, 1b: Tier 1 closed + Tier 2's effects,
-keyframes/animation, masks, scene CRUD, and tracks subsystems closed)
+**Status:** in-progress (1a done, 1b: Tier 1 and Tier 2 fully closed, only Tier 3 remains)
 **Sub-goals:**
 - [x] **1a** Audit every UI-triggerable operation across `apps/web` (buttons, menus,
   shortcuts, panels) and produce a gap-map: covered-by-an-Action vs. direct-handler-bypass
@@ -68,8 +67,11 @@ keyframes/animation, masks, scene CRUD, and tracks subsystems closed)
   `update-bookmark`, `move-bookmark` (3 gaps missed in the original 1a audit, caught and
   closed alongside — see `GAP_MAP.md` v0.6) (PR #1); 54 Actions total. **Tier 2's tracks
   subsystem done 2026-08-06** — `add-track`, `remove-track`, `toggle-track-mute`,
-  `toggle-track-visibility` registered (PR #1); 58 Actions total. Tier 2's remaining
-  project-library-lifecycle subsystem and Tier 3 (element trim/retime/move) remain open.
+  `toggle-track-visibility` registered (PR #1); 58 Actions total. **Tier 2's
+  project-library-lifecycle subsystem done 2026-08-06 — Tier 2 fully closed** —
+  `rename-project`, `duplicate-projects`, `delete-projects`, `update-project-thumbnail`,
+  `close-project` registered (PR #1); 63 Actions total. Only Tier 3 (element
+  insert/trim/retime/move/update, 5 methods) remains.
 **Loop (if iterative):** each cycle → pick the next open gap from the gap-map (largest-
 used-operation first), close it, re-run the gap-map, report the new gap count. Stop when
 the gap-map shows zero gaps.
