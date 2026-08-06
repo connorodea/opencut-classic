@@ -14,7 +14,11 @@ that loads/creates a project and executes an ordered `steps.json` of named Actio
 verified end-to-end against real files on disk, not asserted. All corrections kept in
 order rather than collapsed into a clean-looking final state, since the false starts are
 part of the real record — same practice as every other correction in this document and
-in `GAP_MAP.md`._
+in `GAP_MAP.md`._ **v1.5 adds one significant, sobering finding on top of that: real
+(non-empty) rendered output — export, thumbnails, anything touching an actual frame —
+needs genuine WebGPU, which neither Bun nor Node currently provide. The headless shell
+works completely for editing and persisting a project; it cannot yet render one. See
+the v1.5 section below before assuming Goal 3 can produce a rendered result.**
 
 ## What's actually being decided
 
@@ -366,6 +370,58 @@ headless test project has any — and is a real risk given `RendererManager`'s c
   smoke-tested for every path, just the ones actually run.
 - `v1-to-v2.ts`'s pre-existing positional-args bug (3 spots) remains unfixed —
   legacy-migration-only, still flagged by `tsc`, still out of scope for this pass.
+
+## v1.5 — real-content rendering needs actual WebGPU; traced to the root, not assumed
+
+Follow-up to the `export-project` check in v1.4, which only exercised an **empty**
+project (a legitimate business-logic rejection, not a render). Traced what happens once
+`SceneExporter.export()` gets past that guard and actually renders a frame, since that's
+the case that matters for Goal 3.
+
+**Chain, each link confirmed by reading the code, not inferred:**
+`RendererManager.exportProject` → `SceneExporter` → `CanvasRenderer.render()` →
+`wasmCompositor.render()` → WASM `initCompositor()`/`renderFrame()` (imported directly
+from `opencut-wasm`, exported alongside `initializeGpu`/`getCompositorCanvas`/
+`uploadTexture` — the same 3MB compiled module the whole WASM-loading story has been
+about). `CanvasRenderer`'s own `OffscreenCanvas` field (from `createCanvasSurface`,
+the thing that first threw during thumbnail generation in v1.3/v1.4) turned out to be a
+red herring for this specific question — `render()` doesn't touch it; the actual frame
+compositing goes through `wasmCompositor` entirely.
+
+**Tested each link directly under Bun** (with the WASM plugin preloaded, so these are
+real calls into the compiled module, not typechecking):
+- `initCompositor(64, 64)` → throws `"GPU context not initialized. Call
+  initializeGpu() first."`
+- `initializeGpu()` → throws `"No WebGPU adapter is available"`
+- `typeof navigator.gpu` under bare Bun → `undefined`. Bun does not implement WebGPU at
+  all (a `navigator` object exists; `.gpu` doesn't).
+
+**Conclusion, stated precisely:** this project's compositor is a genuinely GPU-backed
+renderer (wgpu compiled to WASM, targeting WebGPU) — not a CPU/software fallback that
+degrades gracefully. There is no simple polyfill for this. (A `@napi-rs/canvas` install
+was tried and reverted once this chain was traced — it only implements 2D canvas APIs,
+completely orthogonal to WebGPU adapter/device acquisition; it would not have helped and
+was removed rather than left in as dead weight.) Real fixes, none attempted here, all
+substantially bigger than a session continuation:
+- A native WebGPU binding for Bun/Node (e.g. Dawn-backed) — real engineering effort,
+  likely needs actual GPU hardware/drivers on whatever machine runs the headless shell,
+  and Bun-specific compatibility is unverified.
+- A CPU/software rendering fallback path in the Rust/WASM compositor itself — upstream
+  engine work, bigger than the above.
+- Running the headless entry inside a real GPU-capable browser context (headless Chrome
+  via Playwright, with WebGPU flags) instead of bare Bun — a fundamentally different
+  transport than v1.0's decision, back to something resembling the path v1.2 explored
+  and moved away from, for a genuinely different reason this time (GPU access, not the
+  barrel/RSC issue).
+
+**What this means for Goal 2 / Goal 3, concretely:** the headless shell can load,
+create, mutate, and save/reload a project correctly, and can dispatch every Action
+including `export-project` — but **cannot currently produce real rendered video output**.
+Any real edit run through it today will succeed at every step except actually rendering
+a frame. Goal 3's scenario, whenever it's picked, needs to account for this: either the
+scenario doesn't require a rendered preview/export (edit-only, verified by inspecting
+the saved project state), or this gap gets closed first. Not deciding which — that's
+exactly the kind of call this document has repeatedly said isn't mine to make alone.
 
 ## Bonus finding — the WASM plugin also unblocks `bun test`
 

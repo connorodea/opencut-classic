@@ -97,20 +97,33 @@ the gap-map shows zero gaps.
 ### Goal 2 — A headless shell can invoke the Action API with zero GUI · serves: core value prop, "agentic/headless editing" workflow
 **Done when:** an external script/CLI can load a project, invoke Actions against it, and
 produce a valid, openable/exportable project — with no browser or desktop app involved.
-**Status:** done 2026-08-06 — 2a and 2b both complete. `apps/web/headless/run.ts` loads/
-creates a project and runs named Actions from a `steps.json` file against real files on
-disk, verified end-to-end (a settings change + a track add, correctly persisted and
-correctly pruned respectively). "Produce a valid, openable" project is met — the saved
-file is the same storage format the real app reads. Also specifically checked
+**Status:** 2a and 2b's own accept criteria both met 2026-08-06. One honest caveat on
+Goal 2's overall done-when: "openable" is met (the saved file is the same storage
+format the real app reads); "exportable" is met only in the sense that the Action
+dispatches and reports errors correctly — actually rendering real content is currently
+blocked on a genuine WebGPU gap (below), not yet true end-to-end. `apps/web/headless/
+run.ts` loads/creates a project and runs named Actions from a `steps.json` file against
+real files on disk, verified end-to-end (a settings change + a track add, correctly
+persisted and correctly pruned respectively). Also specifically checked
 `export-project` (fire-and-forget, so checked by polling `getExportState()` rather than
 trusting the call not throwing): it dispatches and completes its lifecycle correctly on
 an empty project, resolving with a legitimate business-logic rejection
 (`"Project is empty"`), not an infra crash — so the Action mechanism itself works
-headlessly. Exporting a project with **real content** is still unverified, since no
-headless test project has actual media/elements to encode, and `OffscreenCanvas`/
-renderer dependencies are confirmed to throw the moment they're touched elsewhere
-(thumbnail generation) — real-content export is the next thing to actually run, not
-assumed working by extension.
+headlessly. **Exporting a project with real content: traced to a root cause, and it's
+bigger than expected.** Followed the actual call chain (`RendererManager.exportProject`
+→ `SceneExporter` → `CanvasRenderer.render()` → `wasmCompositor` → WASM
+`initCompositor`/`renderFrame`) and tested each link directly under Bun:
+`initCompositor` requires `initializeGpu()` first, which throws `"No WebGPU adapter is
+available"` — confirmed Bun has no `navigator.gpu` at all. **This project's compositor
+needs genuine WebGPU; there's no software/CPU fallback and no simple polyfill for it**
+(a `@napi-rs/canvas` install was tried and reverted — it only covers 2D canvas APIs,
+unrelated to GPU adapter acquisition, wouldn't have helped). Real fixes are all
+substantially bigger than a session continuation: a native WebGPU binding for Bun/Node,
+a CPU rendering fallback in the Rust engine itself, or running the headless entry inside
+a real GPU-capable browser (headless Chrome via Playwright) instead of bare Bun. **Net
+effect: the headless shell edits and persists a project completely correctly, but
+cannot currently render one** — not "unverified," genuinely can't, until one of the
+above gets built. See `HEADLESS_DESIGN.md` v1.5 for the full chain and evidence.
 **Sub-goals:**
 - [x] **2a** Design the headless invocation contract — CLI vs. local server transport, how
   a caller addresses a project and invokes an Action with args. Explicitly does NOT need to
