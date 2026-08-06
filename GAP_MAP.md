@@ -5,7 +5,7 @@
 > invoked through `EditorCore`'s three managers — `TimelineManager`, `ScenesManager`,
 > `ProjectManager` — via a shared `CommandManager` with undo/redo).
 
-_Last updated: 2026-08-06 · v0.6_
+_Last updated: 2026-08-06 · v0.7_
 
 ## Architecture found
 
@@ -59,7 +59,7 @@ after the action resolves, same pattern as `export-project`'s `getExportState()`
 | **Masks** — **closed** | ~~`insertFreeformPathMaskPoint`, `removeMask`, `toggleMaskInverted`~~ → `insert-freeform-path-mask-point`, `remove-mask`, `toggle-mask-inverted` | Agent can now insert mask points, remove a mask, and invert a mask. (`deleteFreeformPathMaskPoints` was already reachable via `delete-selected`'s mask-point-selection branch — unchanged.) |
 | **Scenes (CRUD)** — **closed** | ~~`createScene`, `deleteScene`, `renameScene`, `switchToScene`~~ → `create-scene`, `delete-scene`, `rename-scene`, `switch-scene` | Scenes are the project's structural unit; agent can now create, remove, rename, and navigate between them. |
 | **Bookmarks (remaining)** — **closed** | ~~`removeBookmark`, `updateBookmark`, `moveBookmark`~~ → `remove-bookmark`, `update-bookmark`, `move-bookmark` | **Correction to this gap-map**: these three `ScenesManager` methods were found during the original v0.1 audit but omitted from the written table by mistake — only `toggleBookmark` made it in. Caught and closed while doing the adjacent scene-CRUD work, since they live in the same file. |
-| **Tracks** | `addTrack`, `removeTrack`, `toggleTrackMute`, `toggleTrackVisibility` | Track-level operations have zero Action coverage — `toggle-elements-muted-selected` / `toggle-elements-visibility-selected` only cover selected *elements*, not tracks themselves. |
+| **Tracks** — **closed** | ~~`addTrack`, `removeTrack`, `toggleTrackMute`, `toggleTrackVisibility`~~ → `add-track`, `remove-track`, `toggle-track-mute`, `toggle-track-visibility` | Agent can now add/remove tracks and mute/hide at the track level, distinct from `toggle-elements-muted-selected` / `toggle-elements-visibility-selected` which only cover selected *elements*. |
 | **Project lifecycle (non-active)** | `renameProject`, `duplicateProjects`, `deleteProjects`, `updateThumbnail` | Agent has no way to manage the project library itself, only edit within an already-open one. |
 
 ### Tier 3 — element-level gaps
@@ -103,14 +103,15 @@ pan) — per VISION.md's MVP boundary these are lower value for agent control an
 deliberately out of scope for Goal 1 unless a Goal 3 proof scenario surfaces a real need.
 
 ## Gap count
-54 registered Actions (30 original + 4 closing Tier 1 + 5 closing effects + 5 closing
-keyframes/animation + 3 closing masks + 7 closing scene CRUD/bookmarks). ~41
-manager-level mutating methods identified (38 original count + 3 bookmark methods found
-missing from the v0.1 write-up, corrected in v0.6). ~37 now have Action coverage. **~4
-methods still have zero Action coverage** — Tier 2's tracks/project-library-lifecycle
-subsystems, plus all of Tier 3.
+58 registered Actions (30 original + 4 closing Tier 1 + 5 closing effects + 5 closing
+keyframes/animation + 3 closing masks + 7 closing scene CRUD/bookmarks + 4 closing
+tracks). ~41 manager-level mutating methods identified. ~41 now have Action coverage.
+**~4 methods still have zero Action coverage** — Tier 2's project-library-lifecycle
+subsystem (`renameProject`, `duplicateProjects`, `deleteProjects`, `updateThumbnail`),
+plus all of Tier 3.
 
 ## Next (1b)
-Tier 1 closed. Tier 2's effects, keyframes/animation, masks, and scene CRUD subsystems
-closed. Continue through Tier 2's remaining subsystems (tracks, project-library
-lifecycle), then Tier 3 (element trim/retime/move).
+Tier 1 closed. Tier 2's effects, keyframes/animation, masks, scene CRUD, and tracks
+subsystems closed. Remaining: Tier 2's project-library lifecycle, then Tier 3
+(`insertElement`, `updateElementTrim`, `updateElementRetime`, `moveElements`,
+`updateElements`).

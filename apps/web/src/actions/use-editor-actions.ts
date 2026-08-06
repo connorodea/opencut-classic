@@ -818,4 +818,40 @@ export function useEditorActions() {
 		},
 		undefined,
 	);
+
+	useActionHandler(
+		"add-track",
+		(args) => {
+			if (!args) return;
+			editor.timeline.addTrack({ type: args.type, index: args.index });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"remove-track",
+		(args) => {
+			if (!args) return;
+			editor.timeline.removeTrack({ trackId: args.trackId });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"toggle-track-mute",
+		(args) => {
+			if (!args) return;
+			editor.timeline.toggleTrackMute({ trackId: args.trackId });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"toggle-track-visibility",
+		(args) => {
+			if (!args) return;
+			editor.timeline.toggleTrackVisibility({ trackId: args.trackId });
+		},
+		undefined,
+	);
 }

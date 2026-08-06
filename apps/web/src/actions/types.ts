@@ -10,7 +10,7 @@ import type {
 } from "@/animation/types";
 import type { MediaTime } from "@/wasm";
 import type { ElementBounds } from "@/preview/element-bounds";
-import type { Bookmark } from "@/timeline";
+import type { Bookmark, TrackType } from "@/timeline";
 import type { TAction } from "./definitions";
 
 export type { TAction };
@@ -108,6 +108,10 @@ export type TActionArgsMap = {
 	"remove-bookmark": { time: MediaTime };
 	"update-bookmark": { time: MediaTime; updates: Partial<Omit<Bookmark, "time">> };
 	"move-bookmark": { fromTime: MediaTime; toTime: MediaTime };
+	"add-track": { type: TrackType; index?: number };
+	"remove-track": { trackId: string };
+	"toggle-track-mute": { trackId: string };
+	"toggle-track-visibility": { trackId: string };
 };
 
 type TKeysWithValueUndefined<T> = {

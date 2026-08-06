@@ -14,7 +14,8 @@ export type TActionCategory =
 	| "effects"
 	| "keyframes"
 	| "masks"
-	| "scenes";
+	| "scenes"
+	| "tracks";
 
 export interface TActionBaseDefinition {
 	description: string;
@@ -334,6 +335,26 @@ export const ACTIONS = {
 		description: "Move a bookmark from one time to another",
 		category: "timeline",
 		args: { fromTime: "number", toTime: "number" },
+	},
+	"add-track": {
+		description: "Add a new track to the timeline",
+		category: "tracks",
+		args: { type: "string", index: "number" },
+	},
+	"remove-track": {
+		description: "Remove a track from the timeline",
+		category: "tracks",
+		args: { trackId: "string" },
+	},
+	"toggle-track-mute": {
+		description: "Mute/unmute a track",
+		category: "tracks",
+		args: { trackId: "string" },
+	},
+	"toggle-track-visibility": {
+		description: "Show/hide a track",
+		category: "tracks",
+		args: { trackId: "string" },
 	},
 } as const satisfies Record<string, TActionBaseDefinition>;
 
