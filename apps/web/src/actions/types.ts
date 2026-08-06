@@ -1,4 +1,6 @@
 import type { MutableRefObject } from "react";
+import type { FrameRate } from "opencut-wasm";
+import type { ExportFormat, ExportQuality } from "@/export";
 import type { TAction } from "./definitions";
 
 export type { TAction };
@@ -10,6 +12,12 @@ export type TActionArgsMap = {
 	"jump-backward": { seconds: number } | undefined;
 	"remove-media-asset": { projectId: string; assetId: string };
 	"remove-media-assets": { projectId: string; assetIds: string[] };
+	"export-project": {
+		format: ExportFormat;
+		quality: ExportQuality;
+		fps?: FrameRate;
+		includeAudio?: boolean;
+	};
 };
 
 type TKeysWithValueUndefined<T> = {

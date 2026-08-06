@@ -517,4 +517,24 @@ export function useEditorActions() {
 		},
 		undefined,
 	);
+
+	useActionHandler(
+		"export-project",
+		(args) => {
+			if (!args) return;
+			// Fire-and-forget: progress/result are observed via
+			// editor.project.getExportState(), same as the export UI does —
+			// keeps this handler's signature consistent with every other
+			// action handler (void, not a returned Promise).
+			void editor.project.export({
+				options: {
+					format: args.format,
+					quality: args.quality,
+					fps: args.fps,
+					includeAudio: args.includeAudio,
+				},
+			});
+		},
+		undefined,
+	);
 }

@@ -9,7 +9,8 @@ export type TActionCategory =
 	| "history"
 	| "timeline"
 	| "controls"
-	| "assets";
+	| "assets"
+	| "project";
 
 export interface TActionBaseDefinition {
 	description: string;
@@ -147,6 +148,16 @@ export const ACTIONS = {
 		description: "Remove media assets",
 		category: "assets",
 		args: { projectId: "string", assetIds: "string[]" },
+	},
+	"export-project": {
+		description: "Render and export the active project to a video file",
+		category: "project",
+		args: {
+			format: "string",
+			quality: "string",
+			fps: "number",
+			includeAudio: "boolean",
+		},
 	},
 } as const satisfies Record<string, TActionBaseDefinition>;
 
