@@ -5,13 +5,14 @@
 > MCP-vs-REST (that's VISION.md's Next milestone) — this is the invocation contract
 > underneath whatever agent-facing protocol comes later.
 
-_2026-08-06 · v1.1 — see the "v1.1 correction" section: the storage-layer plan below
-(section 1) is implemented and verified working. The "single-process script directly
-imports `@/core`" bootstrapping claim is **not** verified and turned out to be wrong as
-stated — a real WASM-loading incompatibility blocks it under Bun/Node outside Next's own
-bundler. Corrected at the bottom rather than silently revised upward, since this session
-already did the wrong thing once (the original v0.1 gap audit under-counted by omitting
-3 methods) and disclosing corrections beats quietly fixing them._
+_2026-08-06 · v1.2 — two corrections now, both at the bottom. v1.1: bare `bun run`
+hits a WASM-loading incompatibility. v1.2: the natural next thing to try — running the
+headless entry inside Next.js's own server runtime instead — was tried and **also
+fails, for a different and unrelated reason**: `EditorCore` transitively imports a
+React component through a barrel-file boundary, which Next's RSC compiler rejects
+outright. Neither of the two candidate paths from v1.0/v1.1 currently works. Both
+corrections are kept rather than silently revised, since disclosing what was wrong beats
+quietly fixing it — same practice as the original gap-map's own under-count correction._
 
 ## What's actually being decided
 
@@ -200,18 +201,75 @@ Neither is implemented. **2b is not done and should not be reported as such** �
 storage layer is real, verified progress; the bootstrapping question this whole design
 doc treated as "already answered" turned out to be the actual remaining risk.
 
+## v1.2 correction — the Next.js-server-runtime path also fails, for an unrelated reason
+
+Tried the "smaller unknown" from v1.1's fix list: added a temporary Route Handler
+(`app/api/.../route.ts`) that imports `@/core` and calls `EditorCore.getInstance()`,
+ran it under real `next dev`, hit it with `curl`. Result, from the actual Turbopack
+compile error (not a guess):
+
+```
+./src/timeline/bookmarks/hooks/use-bookmark-drag.ts:2:2
+You're importing a component that needs `useState`. This React Hook only works in a
+Client Component. To fix, mark the file (or its parent) with the "use client" directive.
+
+Import trace:
+  route.ts → core/index.ts → core/managers/scenes-manager.ts →
+  timeline/bookmarks/index.ts → timeline/bookmarks/components/bookmarks.tsx →
+  timeline/bookmarks/hooks/use-bookmark-drag.ts
+```
+
+`ScenesManager` imports from `@/timeline/bookmarks` (a barrel `index.ts`) for pure
+bookmark-utility functions it actually uses — but that same barrel also re-exports
+`bookmarks.tsx` (a React component) and `use-bookmark-drag.ts` (a hook using
+`useState`/`useRef`). In a browser bundle this is harmless (webpack/Turbopack bundles
+everything together regardless of which exports are used). Next's RSC compiler is
+stricter: it statically checks every *file* reachable from a Server Component/Route
+Handler's import graph for React-hook usage without a `"use client"` directive, and
+fails hard the moment one is found — **per file, not per actually-used export**. So a
+barrel mixing pure logic and React components poisons the whole graph for any
+server-side consumer, even one that only touches the logic half.
+
+This is a genuinely different problem from the WASM one — not a build-tool
+incompatibility, an actual **module-boundary hygiene issue already present in the
+app**: at least one manager reaches through a barrel into component code it doesn't
+use. It would need to be fixed by splitting `@/timeline/bookmarks/index.ts` into a
+logic-only export surface and a components-only one (and `ScenesManager` importing only
+the former) — and there's no reason to assume this is the *only* barrel with this shape;
+other managers likely have the same issue lurking, only surfaced here because
+`ScenesManager` happened to be first in this particular import chain.
+
+**Net effect on the recommendation:** both v1.0's original two candidate fixes are now
+known-blocked, for unrelated reasons. The Next.js-server-runtime path is no longer the
+clear "try this first, it's smaller" option v1.1 called it — it trades one bounded,
+well-understood problem (write a WASM loader) for an open-ended one (find and fix every
+barrel that mixes logic and component exports across however many managers touch them,
+with no way to know the count without trying). **Revised recommendation: try the Bun
+WASM loader first instead.** It's the more bounded piece of work, and fixing it doesn't
+also require it — the barrel-hygiene issue is orthogonal to bootstrapping and would need
+fixing either way before this path is real, but a Bun loader can be built and tested in
+isolation without touching `apps/web`'s own module structure at all.
+
 ## Next (2b)
 
-In order: (1) resolve the WASM-loading blocker above — try the Next.js-server-runtime
-path first since it's the smaller unknown, fall back to a Bun WASM loader if that also
-fails; (2) once `EditorCore.getInstance()` genuinely runs headlessly, extract
-`use-editor-actions.ts`'s handler bodies into plain functions — note this is **not**
-uniformly mechanical the way "thin one-liner into a manager method" suggested: the
-~39 actions added while closing `GAP_MAP.md` are true thin wrappers with no React
-dependency, but a meaningful share of the original 30 close over React-only state
-(`selectedElements`, `selectedKeyframes`, scope-activation refs) that has no headless
-equivalent yet and needs real design work, not a mechanical move; (3) the `run.ts` entry
-point + `steps.json` schema validation; (4) smoke-test `RendererManager`/
-`AudioManager`/`toast` don't throw during a real headless run. Accept criteria per
-GOALS.md 2b unchanged: the shell loads a real project, invokes at least one Action
-end-to-end, and persists the result correctly.
+In order: (1) write a Bun WASM loader for `opencut-wasm` (via `Bun.plugin`) that
+properly instantiates the `.wasm` binary and satisfies whatever `wasm-bindgen`'s glue
+expects, so `wasm.__wbindgen_start` resolves under bare `bun run` — test in isolation
+first (just import `@/wasm`, not the whole of `@/core`) before retrying the full
+`EditorCore.getInstance()` smoke test; (2) once that's clear, re-run the
+`EditorCore.getInstance()` smoke test and see whether the barrel-hygiene issue found in
+v1.2 also blocks a bare-Bun import (it was only confirmed under Next's RSC compiler,
+which is stricter than a plain bundler — a bare Bun/tsc import might tolerate the mixed
+barrel just fine, since nothing enforces the "use client" boundary outside Next/React
+tooling); (3) if it does also block bare Bun, split `@/timeline/bookmarks/index.ts`
+into logic-only and components-only exports, and audit sibling barrels for the same
+pattern; (4) extract `use-editor-actions.ts`'s handler bodies into plain functions —
+note this is **not** uniformly mechanical the way "thin one-liner into a manager
+method" suggested: the ~39 actions added while closing `GAP_MAP.md` are true thin
+wrappers with no React dependency, but a meaningful share of the original 30 close over
+React-only state (`selectedElements`, `selectedKeyframes`, scope-activation refs) that
+has no headless equivalent yet and needs real design work, not a mechanical move; (5)
+the `run.ts` entry point + `steps.json` schema validation; (6) smoke-test
+`RendererManager`/`AudioManager`/`toast` don't throw during a real headless run. Accept
+criteria per GOALS.md 2b unchanged: the shell loads a real project, invokes at least one
+Action end-to-end, and persists the result correctly.

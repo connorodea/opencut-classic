@@ -128,9 +128,16 @@ WASM-loading issue before `EditorCore` can run headlessly at all — see below).
   time just from importing `@/core` transitively (MediaTime utilities share a compiled
   module with this package's GPU-compositing code). 2a's "no browser dependency at
   construction" claim was checked by reading the constructor, not by running it — this is
-  the gap between those two, caught before being reported as done. Two unexplored fixes
-  are written up in `HEADLESS_DESIGN.md`; next iteration should try the Next.js-server-
-  runtime path first (smaller unknown) before writing a custom Bun WASM loader.
+  the gap between those two, caught before being reported as done. **Tried the proposed
+  fix (Next.js-server-runtime path) — it also fails, for an unrelated reason**: a real
+  Route Handler smoke test (`next dev` + `curl`, not a guess) shows `ScenesManager`
+  transitively imports a React component (`bookmarks.tsx`) through a barrel file
+  (`@/timeline/bookmarks/index.ts` mixes logic exports with component exports), which
+  Next's RSC compiler rejects outright. Both v1.1's candidate fixes are now known-blocked
+  for two unrelated reasons — see `HEADLESS_DESIGN.md`'s v1.2 correction for the full
+  account and the revised recommendation (try the Bun WASM loader first — more bounded
+  than an open-ended barrel-hygiene audit across however many managers have the same
+  mixed-export pattern).
 
 ### Goal 3 — A real headless edit proves the Action API is valuable, not just complete · serves: mitigates VISION.md's named risk (stalling at automation-API-complete/feature-thin)
 **Done when:** a real, non-toy scripted/agentic edit is produced entirely through the
