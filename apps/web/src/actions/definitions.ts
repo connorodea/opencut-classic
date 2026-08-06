@@ -12,7 +12,8 @@ export type TActionCategory =
 	| "assets"
 	| "project"
 	| "effects"
-	| "keyframes";
+	| "keyframes"
+	| "masks";
 
 export interface TActionBaseDefinition {
 	description: string;
@@ -274,6 +275,28 @@ export const ACTIONS = {
 			effectId: "string",
 			paramKey: "string",
 			keyframeId: "string",
+		},
+	},
+	"remove-mask": {
+		description: "Remove a mask from a clip",
+		category: "masks",
+		args: { trackId: "string", elementId: "string", maskId: "string" },
+	},
+	"toggle-mask-inverted": {
+		description: "Invert/uninvert a clip's mask",
+		category: "masks",
+		args: { trackId: "string", elementId: "string", maskId: "string" },
+	},
+	"insert-freeform-path-mask-point": {
+		description: "Insert a point into a clip's freeform-path mask",
+		category: "masks",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			maskId: "string",
+			segmentIndex: "number",
+			canvasPoint: "object",
+			bounds: "object",
 		},
 	},
 } as const satisfies Record<string, TActionBaseDefinition>;

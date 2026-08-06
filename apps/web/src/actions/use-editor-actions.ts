@@ -707,4 +707,46 @@ export function useEditorActions() {
 		},
 		undefined,
 	);
+
+	useActionHandler(
+		"remove-mask",
+		(args) => {
+			if (!args) return;
+			editor.timeline.removeMask({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				maskId: args.maskId,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"toggle-mask-inverted",
+		(args) => {
+			if (!args) return;
+			editor.timeline.toggleMaskInverted({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				maskId: args.maskId,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"insert-freeform-path-mask-point",
+		(args) => {
+			if (!args) return;
+			editor.timeline.insertFreeformPathMaskPoint({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				maskId: args.maskId,
+				segmentIndex: args.segmentIndex,
+				canvasPoint: args.canvasPoint,
+				bounds: args.bounds,
+			});
+		},
+		undefined,
+	);
 }

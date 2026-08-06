@@ -9,6 +9,7 @@ import type {
 	ScalarCurveKeyframePatch,
 } from "@/animation/types";
 import type { MediaTime } from "@/wasm";
+import type { ElementBounds } from "@/preview/element-bounds";
 import type { TAction } from "./definitions";
 
 export type { TAction };
@@ -88,6 +89,16 @@ export type TActionArgsMap = {
 		effectId: string;
 		paramKey: string;
 		keyframeId: string;
+	};
+	"remove-mask": { trackId: string; elementId: string; maskId: string };
+	"toggle-mask-inverted": { trackId: string; elementId: string; maskId: string };
+	"insert-freeform-path-mask-point": {
+		trackId: string;
+		elementId: string;
+		maskId: string;
+		segmentIndex: number;
+		canvasPoint: { x: number; y: number };
+		bounds: ElementBounds;
 	};
 };
 
