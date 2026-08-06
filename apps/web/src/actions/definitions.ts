@@ -356,6 +356,30 @@ export const ACTIONS = {
 		category: "tracks",
 		args: { trackId: "string" },
 	},
+	"rename-project": {
+		description: "Rename a saved project",
+		category: "project",
+		args: { id: "string", name: "string" },
+	},
+	"duplicate-projects": {
+		description: "Duplicate one or more saved projects",
+		category: "project",
+		args: { ids: "string[]" },
+	},
+	"delete-projects": {
+		description: "Delete one or more saved projects",
+		category: "project",
+		args: { ids: "string[]" },
+	},
+	"update-project-thumbnail": {
+		description: "Update the active project's thumbnail",
+		category: "project",
+		args: { thumbnail: "string" },
+	},
+	"close-project": {
+		description: "Close the active project without deleting it",
+		category: "project",
+	},
 } as const satisfies Record<string, TActionBaseDefinition>;
 
 export type TAction = keyof typeof ACTIONS;

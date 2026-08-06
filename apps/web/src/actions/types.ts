@@ -112,6 +112,10 @@ export type TActionArgsMap = {
 	"remove-track": { trackId: string };
 	"toggle-track-mute": { trackId: string };
 	"toggle-track-visibility": { trackId: string };
+	"rename-project": { id: string; name: string };
+	"duplicate-projects": { ids: string[] };
+	"delete-projects": { ids: string[] };
+	"update-project-thumbnail": { thumbnail: string };
 };
 
 type TKeysWithValueUndefined<T> = {

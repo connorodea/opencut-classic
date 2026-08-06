@@ -854,4 +854,48 @@ export function useEditorActions() {
 		},
 		undefined,
 	);
+
+	useActionHandler(
+		"rename-project",
+		(args) => {
+			if (!args) return;
+			void editor.project.renameProject({ id: args.id, name: args.name });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"duplicate-projects",
+		(args) => {
+			if (!args) return;
+			void editor.project.duplicateProjects({ ids: args.ids });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"delete-projects",
+		(args) => {
+			if (!args) return;
+			void editor.project.deleteProjects({ ids: args.ids });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-project-thumbnail",
+		(args) => {
+			if (!args) return;
+			void editor.project.updateThumbnail({ thumbnail: args.thumbnail });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"close-project",
+		() => {
+			editor.project.closeProject();
+		},
+		undefined,
+	);
 }
