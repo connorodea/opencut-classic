@@ -3,6 +3,9 @@ import { getProjectDurationFromScenes } from "@/timeline/scenes";
 import type { MediaAsset } from "@/media/types";
 import { IndexedDBAdapter } from "./indexeddb-adapter";
 import { OPFSAdapter } from "./opfs-adapter";
+import { FileSystemAdapter } from "./filesystem-adapter";
+import { FileSystemBlobAdapter } from "./filesystem-blob-adapter";
+import { isBrowserStorageAvailable } from "./headless-paths";
 import {
 	type StorageCapacityCheckResult,
 	StorageQuotaExceededError,
@@ -12,6 +15,7 @@ import {
 } from "./quota";
 import type {
 	MediaAssetData,
+	StorageAdapter,
 	StorageConfig,
 	SerializedProject,
 	SerializedScene,
@@ -52,8 +56,10 @@ function normalizeBookmarks({ raw }: { raw: unknown }): Bookmark[] {
 }
 
 class StorageService {
-	private projectsAdapter: IndexedDBAdapter<SerializedProject>;
-	private savedSoundsAdapter: IndexedDBAdapter<SavedSoundsData>;
+	private projectsAdapter: StorageAdapter<SerializedProject> & {
+		getAll(): Promise<SerializedProject[]>;
+	};
+	private savedSoundsAdapter: StorageAdapter<SavedSoundsData>;
 	private config: StorageConfig;
 	private migrationsPromise: Promise<void> | null = null;
 
@@ -65,17 +71,21 @@ class StorageService {
 			version: 1,
 		};
 
-		this.projectsAdapter = new IndexedDBAdapter<SerializedProject>({
-			dbName: this.config.projectsDb,
-			storeName: "projects",
-			version: this.config.version,
-		});
+		this.projectsAdapter = isBrowserStorageAvailable()
+			? new IndexedDBAdapter<SerializedProject>({
+					dbName: this.config.projectsDb,
+					storeName: "projects",
+					version: this.config.version,
+				})
+			: new FileSystemAdapter<SerializedProject>("projects");
 
-		this.savedSoundsAdapter = new IndexedDBAdapter<SavedSoundsData>({
-			dbName: this.config.savedSoundsDb,
-			storeName: "saved-sounds",
-			version: this.config.version,
-		});
+		this.savedSoundsAdapter = isBrowserStorageAvailable()
+			? new IndexedDBAdapter<SavedSoundsData>({
+					dbName: this.config.savedSoundsDb,
+					storeName: "saved-sounds",
+					version: this.config.version,
+				})
+			: new FileSystemAdapter<SavedSoundsData>("saved-sounds");
 	}
 
 	private async ensureMigrations(): Promise<void> {
@@ -91,13 +101,21 @@ class StorageService {
 	}
 
 	private getProjectMediaAdapters({ projectId }: { projectId: string }) {
-		const mediaMetadataAdapter = new IndexedDBAdapter<MediaAssetData>({
-			dbName: `${this.config.mediaDb}-${projectId}`,
-			storeName: "media-metadata",
-			version: this.config.version,
-		});
+		const mediaMetadataAdapter: StorageAdapter<MediaAssetData> =
+			isBrowserStorageAvailable()
+				? new IndexedDBAdapter<MediaAssetData>({
+						dbName: `${this.config.mediaDb}-${projectId}`,
+						storeName: "media-metadata",
+						version: this.config.version,
+					})
+				: new FileSystemAdapter<MediaAssetData>(
+						`media-metadata-${projectId}`,
+					);
 
-		const mediaAssetsAdapter = new OPFSAdapter(`media-files-${projectId}`);
+		const mediaAssetsAdapter: StorageAdapter<File> =
+			isBrowserStorageAvailable()
+				? new OPFSAdapter(`media-files-${projectId}`)
+				: new FileSystemBlobAdapter(`media-files-${projectId}`);
 
 		return { mediaMetadataAdapter, mediaAssetsAdapter };
 	}

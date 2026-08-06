@@ -5,7 +5,13 @@
 > MCP-vs-REST (that's VISION.md's Next milestone) — this is the invocation contract
 > underneath whatever agent-facing protocol comes later.
 
-_2026-08-06 · v1.0_
+_2026-08-06 · v1.1 — see the "v1.1 correction" section: the storage-layer plan below
+(section 1) is implemented and verified working. The "single-process script directly
+imports `@/core`" bootstrapping claim is **not** verified and turned out to be wrong as
+stated — a real WASM-loading incompatibility blocks it under Bun/Node outside Next's own
+bundler. Corrected at the bottom rather than silently revised upward, since this session
+already did the wrong thing once (the original v0.1 gap audit under-counted by omitting
+3 methods) and disclosing corrections beats quietly fixing them._
 
 ## What's actually being decided
 
@@ -132,12 +138,80 @@ addressing scheme needed.
   implementation pass can start with edits to *already-imported* media (Goal 3's scenario
   can pick footage already in a project) and resolve media import separately.
 
+## v1.1 correction — WASM loading blocks direct `@/core` import under Bun/Node
+
+**(1) Storage — implemented and verified.** `FileSystemAdapter<T>`
+(`apps/web/src/services/storage/filesystem-adapter.ts`) and `FileSystemBlobAdapter`
+(`filesystem-blob-adapter.ts`) both implement `StorageAdapter<T>`; `StorageService`'s
+constructor and `getProjectMediaAdapters` now branch on
+`isBrowserStorageAvailable()` (`typeof indexedDB !== "undefined"`). Verified with a
+standalone script exercising `set`/`get`/`list`/`getAll`/`remove`/`clear` against real
+files on disk under Bun — all round-tripped correctly, including the `{ id: key,
+...value }` merge shape `IndexedDBAdapter.set` uses (matched for callers that read `id`
+back off a stored record). `bun x tsc --noEmit` shows zero new errors from this change.
+
+**(2) Bootstrapping — the "no browser dependency" claim was wrong.** Actually running
+`import { EditorCore } from "@/core"; EditorCore.getInstance()` under `bun run` (not
+just typechecking it) fails immediately:
+
+```
+TypeError: wasm.__wbindgen_start is not a function
+  at .../opencut-wasm/opencut_wasm.js:6:6
+```
+
+`opencut-wasm`'s glue code does `import * as wasm from "./opencut_wasm_bg.wasm"; ...
+wasm.__wbindgen_start()` — this relies on the *bundler* (webpack/Next.js's async-WASM
+handling) to transparently instantiate the `.wasm` binary and hand back its exports
+object in place of the raw import. Bun's native `.wasm` import instead returns an
+uninstantiated `WebAssembly.Module`, so `wasm.__wbindgen_start` is `undefined`. This
+fires at **module load time** (a top-level side effect in the wasm-bindgen glue), so it
+can't be dodged by simply not calling any WASM-backed function — importing `@/core` at
+all pulls it in transitively, since `MediaTime` utilities (`@/wasm`, used pervasively —
+`TProjectMetadata.duration`, every manager) live in the same compiled module as this
+package's GPU-compositing exports (`initializeGpu`, `getCompositorCanvas`, `renderFrame`,
+`uploadTexture` — a 3MB binary). The original design doc's "EditorCore has no window/
+React dependency at construction" claim was checked by reading code and confirming the
+constructor's own logic doesn't touch DOM APIs — true, but incomplete: it didn't trace
+the transitive import graph far enough to catch this. That's the gap between "read the
+code" and "ran the code," and this correction exists because the second one was actually
+done before writing this down as fact.
+
+**What this changes about the transport recommendation:** the "single-process script,
+no server, no CLI-per-action" *design* still holds — nothing here argues for a server or
+a fresh-process-per-action model. What's wrong is the assumption that such a script can
+`import "@/core"` directly under a bare Bun/Node runtime. Two real paths forward, neither
+explored yet:
+- **Write a Bun-native loader for `opencut-wasm`** (Bun supports custom import plugins)
+  that properly instantiates the `.wasm` binary and provides whatever import object
+  wasm-bindgen expects, so `wasm.__wbindgen_start` resolves. Keeps the single-process
+  script design intact; the fix is scoped to one loader, not the app.
+- **Run the headless entry inside Next.js's own server runtime** (a Route
+  Handler/Server Action, invoked via `next build && next start` + one local HTTP call
+  per session) instead of bare `bun run` — Next's bundler already handles this exact WASM
+  import correctly for the browser bundle and likely does for its server bundle too
+  (unverified). This technically becomes "a local server," but not for the reason the
+  transport section above rejected a server (agent-interleaved observation/mutation) —
+  it'd be a single request that runs a whole `steps.json` script and returns, same shape
+  as the single-process design, just hosted inside Next's process instead of a bare
+  script. Worth trying first since it needs no new WASM-loading code, only proving Next's
+  server bundle actually handles `.wasm` the same way the client bundle does.
+
+Neither is implemented. **2b is not done and should not be reported as such** — only the
+storage layer is real, verified progress; the bootstrapping question this whole design
+doc treated as "already answered" turned out to be the actual remaining risk.
+
 ## Next (2b)
 
-Implement the runner: (1) `FileSystemAdapter`/`FileSystemBlobAdapter` + the
-environment-branch in `StorageService`, (2) extract `use-editor-actions.ts`'s handler
-bodies into plain functions callable from both the React hook and the headless runner,
-(3) the `run.ts` entry point + `steps.json` schema validation, (4) smoke-test
-`RendererManager`/`AudioManager`/`toast` don't throw during a real headless run. Accept
-criteria per GOALS.md 2b: the shell loads a real project, invokes at least one Action
+In order: (1) resolve the WASM-loading blocker above — try the Next.js-server-runtime
+path first since it's the smaller unknown, fall back to a Bun WASM loader if that also
+fails; (2) once `EditorCore.getInstance()` genuinely runs headlessly, extract
+`use-editor-actions.ts`'s handler bodies into plain functions — note this is **not**
+uniformly mechanical the way "thin one-liner into a manager method" suggested: the
+~39 actions added while closing `GAP_MAP.md` are true thin wrappers with no React
+dependency, but a meaningful share of the original 30 close over React-only state
+(`selectedElements`, `selectedKeyframes`, scope-activation refs) that has no headless
+equivalent yet and needs real design work, not a mechanical move; (3) the `run.ts` entry
+point + `steps.json` schema validation; (4) smoke-test `RendererManager`/
+`AudioManager`/`toast` don't throw during a real headless run. Accept criteria per
+GOALS.md 2b unchanged: the shell loads a real project, invokes at least one Action
 end-to-end, and persists the result correctly.

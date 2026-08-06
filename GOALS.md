@@ -93,7 +93,8 @@ the gap-map shows zero gaps.
 ### Goal 2 — A headless shell can invoke the Action API with zero GUI · serves: core value prop, "agentic/headless editing" workflow
 **Done when:** an external script/CLI can load a project, invoke Actions against it, and
 produce a valid, openable/exportable project — with no browser or desktop app involved.
-**Status:** in-progress — 2a done, 2b not started.
+**Status:** in-progress — 2a done, 2b started (storage layer done, blocked on a real
+WASM-loading issue before `EditorCore` can run headlessly at all — see below).
 **Sub-goals:**
 - [x] **2a** Design the headless invocation contract — CLI vs. local server transport, how
   a caller addresses a project and invokes an Action with args. Explicitly does NOT need to
@@ -116,7 +117,20 @@ produce a valid, openable/exportable project — with no browser or desktop app 
   `apps/desktop`, calling the same Action layer Goal 1 completed — no parallel/duplicate
   logic — _advances:_ the Action-layer-stays-source-of-truth principle — _accept:_ the
   shell loads a real project, invokes at least one Action end-to-end, and persists the
-  result correctly.
+  result correctly. **Started 2026-08-06, blocked partway through — see
+  `HEADLESS_DESIGN.md`'s v1.1 correction.** Storage layer is done and verified for real
+  (`FileSystemAdapter`/`FileSystemBlobAdapter`, `StorageService` branches on environment;
+  a standalone script round-tripped set/get/list/getAll/remove/clear against real files
+  on disk under Bun). Bootstrapping `EditorCore` headlessly is **not** done: actually
+  running `EditorCore.getInstance()` under `bun run` (not just typechecking it) throws —
+  `opencut-wasm`'s glue code expects a bundler to auto-instantiate its `.wasm` binary,
+  which Bun's native WASM import doesn't do the same way, and this fires at module-load
+  time just from importing `@/core` transitively (MediaTime utilities share a compiled
+  module with this package's GPU-compositing code). 2a's "no browser dependency at
+  construction" claim was checked by reading the constructor, not by running it — this is
+  the gap between those two, caught before being reported as done. Two unexplored fixes
+  are written up in `HEADLESS_DESIGN.md`; next iteration should try the Next.js-server-
+  runtime path first (smaller unknown) before writing a custom Bun WASM loader.
 
 ### Goal 3 — A real headless edit proves the Action API is valuable, not just complete · serves: mitigates VISION.md's named risk (stalling at automation-API-complete/feature-thin)
 **Done when:** a real, non-toy scripted/agentic edit is produced entirely through the
