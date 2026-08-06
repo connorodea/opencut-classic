@@ -3,7 +3,7 @@
 > North star: the video editor where every capability a human can click is also a command
 > an AI agent can call — so DaVinci-grade grading, FCP-grade editing, CapCut-grade social
 > speed, and Descript-grade text editing all become programmable from one core.
-> Source: VISION.md (v3) · _Last updated: 2026-08-06 · Plan version: v2_
+> Source: VISION.md (v3) · _Last updated: 2026-08-06 · Plan version: v2.1_
 
 ## Alignment anchors (every goal must serve these)
 
@@ -224,7 +224,7 @@ and headlessly verifiable — the same rigor `GAP_MAP.md` established for Goal 1
 pixel-level correctness explicitly gated on the still-unresolved WebGPU rendering
 blocker, not assumed solved.
 
-**Status:** todo — started 2026-08-06. **Explicit sequencing override, recorded rather
+**Status:** in-progress — 4a done 2026-08-06, 4b not started. **Explicit sequencing override, recorded rather
 than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
 both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
 gated behind Goal 3 passing, and Goal 3 has not passed — it's still blocked on a
@@ -236,7 +236,7 @@ Later-phase start needs its own explicit go-ahead the same way, not an implied b
 release once one override happens.
 
 **Sub-goals:**
-- [ ] **4a** Audit `DAVINCI_PARITY.md`'s Phase 1 scope against the current codebase,
+- [x] **4a** Audit `DAVINCI_PARITY.md`'s Phase 1 scope against the current codebase,
   design the grading data model (where grade state lives — a new field set on
   `TimelineElement`? a parallel `Command`/`Manager` pair mirroring how effects work?
   what shape do primary/curve/qualifier/node/LUT data take?), and produce a gap-map the
@@ -245,7 +245,26 @@ release once one override happens.
   original v0.1 gap-map missed 3 methods) — _accept:_ a written design + gap-map
   covering every Phase 1 item from `DAVINCI_PARITY.md`, each tagged with its target
   Action name(s) and whether it needs new data-model work or fits the existing
-  `add-clip-effect`-style granular-Action pattern directly.
+  `add-clip-effect`-style granular-Action pattern directly. **Done 2026-08-06 — see
+  `COLOR_GRADING_DESIGN.md`.** Key finding: grade state needs no new top-level data
+  structure — every Phase 1 primitive (wheels, log wheels, curves, qualifiers, LUTs)
+  fits as a new `EffectDefinition` using Actions already closed in Goal 1 (`add-clip-
+  effect`/`update-clip-effect-params`/etc.), and a serial node graph is already free
+  (the effects list's existing ordering behavior) — only *parallel* node graphs need
+  real new data-model work, recommended deferred past 4b's first pass. The harder,
+  non-obvious part isn't in `apps/web` at all: this repo also contains the Rust engine
+  (`rust/crates/{effects,gpu,masks,compositor}`, compiling to the `opencut-wasm` npm
+  package `apps/web` depends on), and its effect-uniform-packing code
+  (`rust/crates/effects/src/pipeline.rs`) is hardcoded to Gaussian blur's specific
+  uniform names — adding any genuinely different effect requires generalizing that
+  function first, not just adding a shader file. Confirmed the Rust→WASM build
+  toolchain actually works (installed `wasm-pack`, ran a clean `bun run build:wasm`,
+  succeeded) rather than trusting the README. Also found, and separately documented in
+  `HEADLESS_DESIGN.md` v1.6: native Rust `wgpu` has real, working GPU access on this
+  machine via Metal (verified by a passing test), completely unaffected by the
+  browser/Bun WebGPU gap that blocks 2b's rendering — meaning new grading shaders can
+  plausibly be visually verified via native `cargo test` independent of whether that
+  browser-side gap ever closes.
 - [ ] **4b** Close every gap from 4a, subsystem by subsystem in `DAVINCI_PARITY.md`'s
   listed order (primary/log wheels → curves → qualifiers → node graph → LUTs → scopes)
   — register each Action per `docs/actions.md`, verify headlessly via
@@ -377,3 +396,11 @@ documented rather than worked around. Don't repeat already-closed gaps.
   `[ ]` with stale mid-progress detail text, even though Goal 2's own top-level status
   had already recorded it done — checkbox and detail now match the real final state
   (handler-extraction + `run.ts` real-Action dispatch, verified).
+- 2026-08-06 v2.1 — Goal 4a done: `COLOR_GRADING_DESIGN.md` audits Phase 1 against both
+  `apps/web` (grade state fits the existing effects Action pattern, no new Action types
+  needed for wheels/curves/qualifiers/LUTs) and the previously-unexamined `rust/`
+  engine source (the real prerequisite: generalizing a hardcoded uniform-packing
+  function before any new shader beyond blur can exist). Also found and documented in
+  `HEADLESS_DESIGN.md` v1.6: native Rust `wgpu` has real GPU access on this machine,
+  unaffected by the browser/Bun WebGPU gap blocking Goal 2's rendering — a fourth,
+  empirically-verified fix path for that separate blocker.
