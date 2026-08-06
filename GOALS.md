@@ -34,8 +34,8 @@ list above, deferred to VISION.md's Next/Later milestones.
 **Done when:** every currently UI-triggerable operation in classic has a corresponding
 registered Action with typed args and a doc entry per the existing `docs/actions.md`
 pattern; no UI handler calls `editor.xxx()` directly, bypassing `invokeAction`.
-**Status:** in-progress (1a done, 1b: Tier 1 closed + Tier 2's effects and
-keyframes/animation subsystems closed)
+**Status:** in-progress (1a done, 1b: Tier 1 closed + Tier 2's effects,
+keyframes/animation, and masks subsystems closed)
 **Sub-goals:**
 - [x] **1a** Audit every UI-triggerable operation across `apps/web` (buttons, menus,
   shortcuts, panels) and produce a gap-map: covered-by-an-Action vs. direct-handler-bypass
@@ -61,8 +61,10 @@ keyframes/animation subsystems closed)
   (PR #1); 39 Actions total. **Tier 2's keyframes/animation subsystem done 2026-08-06** —
   `upsert-keyframe`, `retime-keyframe`, `update-keyframe-curve`,
   `upsert-effect-param-keyframe`, `remove-effect-param-keyframe` registered (PR #1);
-  44 Actions total. Tier 2's remaining subsystems (masks, scene CRUD, tracks,
-  project-library lifecycle) and Tier 3 (element trim/retime/move) remain open.
+  44 Actions total. **Tier 2's masks subsystem done 2026-08-06** — `remove-mask`,
+  `toggle-mask-inverted`, `insert-freeform-path-mask-point` registered (PR #1);
+  47 Actions total. Tier 2's remaining subsystems (scene CRUD, tracks, project-library
+  lifecycle) and Tier 3 (element trim/retime/move) remain open.
 **Loop (if iterative):** each cycle → pick the next open gap from the gap-map (largest-
 used-operation first), close it, re-run the gap-map, report the new gap count. Stop when
 the gap-map shows zero gaps.
