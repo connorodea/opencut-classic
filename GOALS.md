@@ -93,8 +93,9 @@ the gap-map shows zero gaps.
 ### Goal 2 — A headless shell can invoke the Action API with zero GUI · serves: core value prop, "agentic/headless editing" workflow
 **Done when:** an external script/CLI can load a project, invoke Actions against it, and
 produce a valid, openable/exportable project — with no browser or desktop app involved.
-**Status:** in-progress — 2a done, 2b started (storage layer done, blocked on a real
-WASM-loading issue before `EditorCore` can run headlessly at all — see below).
+**Status:** in-progress — 2a done, 2b's bootstrapping blocker (storage + WASM loading)
+is resolved and verified; the actual Action-layer invocation path (handler extraction +
+run.ts) is what's left — see below.
 **Sub-goals:**
 - [x] **2a** Design the headless invocation contract — CLI vs. local server transport, how
   a caller addresses a project and invokes an Action with args. Explicitly does NOT need to
@@ -133,11 +134,28 @@ WASM-loading issue before `EditorCore` can run headlessly at all — see below).
   Route Handler smoke test (`next dev` + `curl`, not a guess) shows `ScenesManager`
   transitively imports a React component (`bookmarks.tsx`) through a barrel file
   (`@/timeline/bookmarks/index.ts` mixes logic exports with component exports), which
-  Next's RSC compiler rejects outright. Both v1.1's candidate fixes are now known-blocked
-  for two unrelated reasons — see `HEADLESS_DESIGN.md`'s v1.2 correction for the full
-  account and the revised recommendation (try the Bun WASM loader first — more bounded
-  than an open-ended barrel-hygiene audit across however many managers have the same
-  mixed-export pattern).
+  Next's RSC compiler rejects outright. Both v1.1's candidate fixes were known-blocked
+  for two unrelated reasons at that point. **Then the WASM blocker was actually fixed
+  (`HEADLESS_DESIGN.md` v1.3)**: `apps/web/headless/wasm-bindgen-bun-plugin.ts`, a real
+  `Bun.plugin` that instantiates wasm-bindgen "bundler"-target `.wasm` binaries under
+  bare Bun by introspecting the compiled module's import section
+  (`WebAssembly.Module.imports()`) and wiring it to its glue JS file directly — no
+  Next.js involved, sidestepping the v1.2 barrel issue entirely (confirmed: "use client"
+  is a Next-RSC-only concept, bare Bun doesn't enforce it). Verified escalating from a
+  standalone `opencut-wasm` call, to `EditorCore.getInstance()` constructing cleanly, to
+  a full create→mutate→save→reset→reload round-trip
+  (`apps/web/headless/bootstrap-proof.ts`, kept in the repo) — all pass. Along the way,
+  fixed a genuinely pre-existing bug on the critical path:
+  `migrations/runner.ts` called `IndexedDBAdapter`'s constructor with 3 positional args
+  against a 1-object-arg signature (already flagged by `tsc` in this session's very
+  first baseline, unrelated to headless work, just never hit until `loadProject` was
+  actually exercised outside a browser). `v1-to-v2.ts` has the same bug in 3 more spots,
+  left unfixed — legacy-migration-only, out of scope for this pass.
+  **Precision note**: the proof calls `editor.project.updateSettings(...)` (the manager
+  method) directly, not through `invokeAction`— so what's proven is that `EditorCore` +
+  persistence work headlessly at all, not yet that a registered Action does. 2b's actual
+  accept criteria (invoke an Action end-to-end) still needs the handler-extraction work
+  below before it's genuinely met.
 
 ### Goal 3 — A real headless edit proves the Action API is valuable, not just complete · serves: mitigates VISION.md's named risk (stalling at automation-API-complete/feature-thin)
 **Done when:** a real, non-toy scripted/agentic edit is produced entirely through the

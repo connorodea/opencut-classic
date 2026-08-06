@@ -5,14 +5,17 @@
 > MCP-vs-REST (that's VISION.md's Next milestone) — this is the invocation contract
 > underneath whatever agent-facing protocol comes later.
 
-_2026-08-06 · v1.2 — two corrections now, both at the bottom. v1.1: bare `bun run`
-hits a WASM-loading incompatibility. v1.2: the natural next thing to try — running the
-headless entry inside Next.js's own server runtime instead — was tried and **also
-fails, for a different and unrelated reason**: `EditorCore` transitively imports a
-React component through a barrel-file boundary, which Next's RSC compiler rejects
-outright. Neither of the two candidate paths from v1.0/v1.1 currently works. Both
-corrections are kept rather than silently revised, since disclosing what was wrong beats
-quietly fixing it — same practice as the original gap-map's own under-count correction._
+_2026-08-06 · v1.3 — **the bootstrapping blocker is resolved.** v1.1 found bare `bun
+run` breaks on WASM loading; v1.2 found the proposed Next.js-server-runtime fix breaks
+differently (a barrel-file/RSC issue); **v1.3 fixes the actual problem** — a
+custom Bun loader plugin for `opencut-wasm` (see the v1.3 section) — and
+`EditorCore.getInstance()` now genuinely runs headlessly under bare Bun: verified with a
+kept proof script (`apps/web/headless/bootstrap-proof.ts`) that creates a project,
+mutates it, saves, resets the in-memory singleton to simulate a fresh process, reloads
+from disk, and confirms the mutation survived. All three corrections are kept in order
+rather than collapsed into a clean-looking final state, since the false starts are part
+of the real record — same practice as every other correction in this document and in
+`GAP_MAP.md`._
 
 ## What's actually being decided
 
@@ -250,26 +253,88 @@ also require it — the barrel-hygiene issue is orthogonal to bootstrapping and 
 fixing either way before this path is real, but a Bun loader can be built and tested in
 isolation without touching `apps/web`'s own module structure at all.
 
+## v1.3 — the WASM loader, built and verified
+
+Confirmed the barrel-hygiene question from v1.2's "next" list first: a bare Bun/tsc
+import doesn't enforce Next's "use client" convention at all (that's purely a Next.js
+RSC-compiler concept, not a JS/TS runtime one), so the barrel issue that blocked the
+Route Handler path **does not block bare Bun**. Only the WASM loading needed fixing.
+
+**What the WASM incompatibility actually is, precisely** (not just "it's a bundler
+thing" — checked with `WebAssembly.Module.imports()`): `opencut_wasm_bg.wasm`'s compiled
+import section has 609 imports, all under a single import-module name:
+`"./opencut_wasm_bg.js"` — wasm-bindgen's "bundler" target convention, where the
+`.wasm` binary's own import declarations literally reference its sibling glue file's
+relative path. A real bundler resolves this by importing that glue file for its exports
+(609 `__wbg_*`-prefixed JS-interop helper functions — iterator protocol, `Map`
+instanceof checks, etc., none of which need the WASM instance itself) and using them as
+the `WebAssembly.instantiate` import object. Bun's native `.wasm` import returns only an
+uninstantiated `WebAssembly.Module`, doing none of this.
+
+**The fix** — `apps/web/headless/wasm-bindgen-bun-plugin.ts`, a `Bun.plugin` that
+intercepts any `.wasm` import: reads the binary, introspects its import section for the
+glue-module name (generically — not hardcoded to `opencut_wasm_bg.js`, so it'd work for
+any wasm-bindgen bundler-target module), imports that glue module, instantiates against
+it, and returns the resulting instance's exports as the load result. Loaded via
+`bun run --preload ./headless/wasm-bindgen-bun-plugin.ts <script>`.
+
+**Verified in three escalating steps, not just "it typechecks":**
+1. `import * as wasm from "opencut-wasm"` + call `wasm.TICKS_PER_SECOND()` directly →
+   real value (`120000`) back from the actual compiled Rust function.
+2. `EditorCore.getInstance()` → constructs cleanly, all managers present.
+3. `apps/web/headless/bootstrap-proof.ts` (kept in the repo): create a project, mutate
+   it (`updateSettings`), save, `EditorCore.reset()` to simulate a fresh process, reload
+   from disk via the `FileSystemAdapter` storage layer, confirm the mutation survived.
+   **All five checks pass.**
+
+**A false alarm along the way, worth recording so it isn't repeated:** the first version
+of the proof script used `addTrack` instead of `updateSettings`, and the added track
+appeared to vanish by save time — looked exactly like a headless-specific state-sync
+bug. It wasn't. `EditorCore`'s constructor (`apps/web/src/core/index.ts`) registers a
+reactor that runs after every command and prunes any overlay/audio track with zero
+elements — an empty track added and never populated doesn't survive in the browser
+either. Confirmed by calling `AddTrackCommand.execute()` directly, bypassing
+`CommandManager` (and therefore the reactor): the track persisted in that path. Swapped
+the proof to `updateSettings`, which isn't subject to pruning, and it passes cleanly.
+Recorded because "the headless script's result looks wrong" and "the headless script
+found a real headless-only bug" are different claims, and this was nearly the wrong one.
+
+**A genuinely pre-existing bug found and fixed on the critical path:**
+`services/storage/migrations/runner.ts` unconditionally calls `IndexedDBAdapter`'s
+constructor with three positional arguments (`new IndexedDBAdapter(dbName, storeName,
+version)`), but the actual constructor takes one destructured object
+(`{dbName, storeName, version}`) — already flagged as a `tsc` error in this session's
+very first baseline check, before any of this session's changes. In a browser this
+silently produces a broken-but-non-crashing adapter (destructuring a string doesn't
+throw); in Node it crashes outright once `isBrowserStorageAvailable()` was false and hit
+`indexedDB.open`. Fixed alongside the environment-branch work since it was directly on
+`loadProject`'s critical path and already broken either way — `v1-to-v2.ts` has the same
+positional-args bug in three more places, **left unfixed**: it's the legacy v1→v2
+migration path specifically, not reachable by any project created at the current
+version, and out of scope for this pass (still flagged in `tsc`'s output, unchanged).
+
 ## Next (2b)
 
-In order: (1) write a Bun WASM loader for `opencut-wasm` (via `Bun.plugin`) that
-properly instantiates the `.wasm` binary and satisfies whatever `wasm-bindgen`'s glue
-expects, so `wasm.__wbindgen_start` resolves under bare `bun run` — test in isolation
-first (just import `@/wasm`, not the whole of `@/core`) before retrying the full
-`EditorCore.getInstance()` smoke test; (2) once that's clear, re-run the
-`EditorCore.getInstance()` smoke test and see whether the barrel-hygiene issue found in
-v1.2 also blocks a bare-Bun import (it was only confirmed under Next's RSC compiler,
-which is stricter than a plain bundler — a bare Bun/tsc import might tolerate the mixed
-barrel just fine, since nothing enforces the "use client" boundary outside Next/React
-tooling); (3) if it does also block bare Bun, split `@/timeline/bookmarks/index.ts`
-into logic-only and components-only exports, and audit sibling barrels for the same
-pattern; (4) extract `use-editor-actions.ts`'s handler bodies into plain functions —
-note this is **not** uniformly mechanical the way "thin one-liner into a manager
-method" suggested: the ~39 actions added while closing `GAP_MAP.md` are true thin
-wrappers with no React dependency, but a meaningful share of the original 30 close over
-React-only state (`selectedElements`, `selectedKeyframes`, scope-activation refs) that
-has no headless equivalent yet and needs real design work, not a mechanical move; (5)
-the `run.ts` entry point + `steps.json` schema validation; (6) smoke-test
-`RendererManager`/`AudioManager`/`toast` don't throw during a real headless run. Accept
-criteria per GOALS.md 2b unchanged: the shell loads a real project, invokes at least one
-Action end-to-end, and persists the result correctly.
+Bootstrapping is done. What's left, in order: (1) extract `use-editor-actions.ts`'s
+handler bodies into plain functions callable from both the React hook and a headless
+runner — note this is **not** uniformly mechanical the way "thin one-liner into a
+manager method" suggested: the ~39 actions added while closing `GAP_MAP.md` are true
+thin wrappers with no React dependency, but a meaningful share of the original 30 close
+over React-only state (`selectedElements`, `selectedKeyframes`, scope-activation refs)
+that has no headless equivalent yet and needs real design work, not a mechanical move;
+(2) the `run.ts` entry point + `steps.json` schema validation, reusing the
+`--preload wasm-bindgen-bun-plugin.ts` pattern proven here; (3) smoke-test
+`RendererManager`/`AudioManager`/`toast` the way `OffscreenCanvas` was smoke-tested here
+(it throws, but the throw is already caught by `project-manager.ts`'s own try/catch
+around thumbnail generation — confirmed by the proof script's log output, not assumed);
+(4) decide whether to fix `v1-to-v2.ts`'s pre-existing positional-args bug now or leave
+it tracked. Accept criteria per GOALS.md 2b: the shell loads a real project, invokes at
+least one Action end-to-end, and persists the result correctly. **Not yet met — be
+precise about what the proof script actually shows.** It calls
+`editor.project.updateSettings(...)` — the manager method the `update-project-settings`
+Action wraps — directly, not through `invokeAction`/`useActionHandler`, which still
+requires a React tree per the existing wiring. What's proven is the prerequisite
+(`EditorCore` + persistence run headlessly at all, with a real save/reload round-trip);
+what's still missing is (1) and (2) above, the actual Action-layer invocation path. Don't
+conflate "the manager method works headlessly" with "the Action works headlessly" —
+they're not the same claim, and 2b's accept criteria is written in terms of the latter.
