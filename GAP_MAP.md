@@ -5,7 +5,9 @@
 > invoked through `EditorCore`'s three managers — `TimelineManager`, `ScenesManager`,
 > `ProjectManager` — via a shared `CommandManager` with undo/redo).
 
-_Last updated: 2026-08-06 · v0.8_
+_Last updated: 2026-08-06 · v1.0 — Tier 1, Tier 2, Tier 3, and the one genuine
+direct-bypass gap are all closed. The remaining media-import gap is intentionally
+deferred to Goal 2a rather than closed superficially here._
 
 ## Architecture found
 
@@ -63,14 +65,16 @@ after the action resolves, same pattern as `export-project`'s `getExportState()`
 | **Project lifecycle (non-active)** — **closed** | ~~`renameProject`, `duplicateProjects`, `deleteProjects`, `updateThumbnail`~~ → `rename-project`, `duplicate-projects`, `delete-projects`, `update-project-thumbnail`, plus `closeProject` → `close-project` (found while closing this row — zero-arg method in the same file, not in the original count) | Agent can now manage the project library itself (rename/duplicate/delete saved projects, update thumbnail, close without deleting), not just edit within an already-open one. |
 
 ### Tier 3 — element-level gaps
-| Manager method | What it does | Why it matters |
-|---|---|---|
-| `insertElement` | Insert a new element onto the timeline | No generic "add this clip/element" action; only removal (`remove-media-asset(s)`) and drag/drop-driven insertion exist. |
-| `updateElementTrim` | Trim a clip's in/out point | Currently mouse-drag only. |
-| `updateElementRetime` | Change a clip's playback speed/retiming | Currently mouse-drag only. |
-| `moveElements` | Move element(s) to a new track/time | Currently drag-only; no programmatic reposition. |
-| `updateElements` | Generic element property update | No batch/generic update path exposed. |
-| `toggleSourceAudioSeparation` | Extract/recover source audio | **Already has an Action** (`toggle-source-audio`) — not a gap, confirms the pattern works when applied. |
+**Status: closed.**
+
+| Manager method | What it does | Why it matters | Closed by |
+|---|---|---|---|
+| `insertElement` | Insert a new element onto the timeline | No generic "add this clip/element" action; only removal (`remove-media-asset(s)`) and drag/drop-driven insertion existed. | `insert-element` |
+| `updateElementTrim` | Trim a clip's in/out point | Was mouse-drag only. | `update-element-trim` |
+| `updateElementRetime` | Change a clip's playback speed/retiming | Was mouse-drag only. | `update-element-retime` |
+| `moveElements` | Move element(s) to a new track/time | Was drag-only; no programmatic reposition. | `move-elements` |
+| `updateElements` | Generic element property update | No batch/generic update path was exposed. | `update-elements` |
+| `toggleSourceAudioSeparation` | Extract/recover source audio | **Already had an Action** (`toggle-source-audio`) — not a gap, confirmed the pattern works when applied. | — |
 
 ## What's already covered (confirms the pattern, no action needed)
 `toggle-play`, `seek-forward/backward`, `frame-step-forward/backward`, `jump-forward/backward`,
@@ -86,14 +90,26 @@ these are UI/player-local state), `split`/`split-left`/`split-right` (→ `split
 
 ## Direct-bypass call sites (UI/controller code instantiating Commands or calling manager
 methods without going through `invokeAction` at all — separate from "no Action exists")
-- `apps/web/src/media/use-paste-media.ts`
-- `apps/web/src/subtitles/insert.ts`
-- `apps/web/src/timeline/controllers/drag-drop-controller.ts`
+The explicit call this doc asked for, made:
 
-These aren't necessarily wrong (drag/drop and paste are inherently direct-manipulation
-UI, not natural "invoke an Action with args" flows even after gap closure) but each
-should get an explicit call in 1b: either it stays direct-manipulation-only by design, or
-it gets a parallel Action for agent access to the same outcome.
+- **`apps/web/src/subtitles/insert.ts`** (`insertCaptionChunksAsTextTrack`) — **closed**,
+  via `insert-captions-as-text-track`. This one turned out to be a pure function of
+  `(editor, captions)` with no browser/DOM dependency — same shape as every other Tier 3
+  closure, just reached via a helper module instead of a manager method directly. No
+  reason to leave it out.
+- **`apps/web/src/media/use-paste-media.ts`** and
+  **`apps/web/src/timeline/controllers/drag-drop-controller.ts`** — **stay
+  direct-manipulation-only by design, not closed.** Both are driven by raw browser
+  `ClipboardEvent`/`DragEvent` data (`DataTransfer` → `File[]`) and an async
+  `processMediaAssets` transcoding step before any Command runs. An agent invoking these
+  through the Action API wouldn't have OS-clipboard/drag `File` objects to hand over in
+  the first place — the actual gap underneath isn't "these bypass `invokeAction`", it's
+  **"there is no Action for importing/creating a media asset at all"** (only
+  `remove-media-asset(s)` exist; nothing like `add-media-asset` does). That's a real,
+  separate, larger gap — it needs a design decision (accept a pre-processed `MediaAsset`?
+  a URL? a path?) rather than a thin wrapper, and arguably belongs with Goal 2's headless
+  invocation contract (2a) rather than squeezed into this sweep. Flagging it there rather
+  than closing it here with something superficial.
 
 ## Scope note
 This audit covers the **editing/project capability surface** (managers + commands) since
@@ -103,13 +119,20 @@ pan) — per VISION.md's MVP boundary these are lower value for agent control an
 deliberately out of scope for Goal 1 unless a Goal 3 proof scenario surfaces a real need.
 
 ## Gap count
-63 registered Actions (30 original + 4 closing Tier 1 + 5 closing effects + 5 closing
+69 registered Actions (30 original + 4 closing Tier 1 + 5 closing effects + 5 closing
 keyframes/animation + 3 closing masks + 7 closing scene CRUD/bookmarks + 4 closing
-tracks + 5 closing project-library lifecycle). ~42 manager-level mutating methods
-identified (41 + `closeProject`, found missing from the count while closing this row).
-~46 now have Action coverage. **Tier 1 and Tier 2 are fully closed. Only Tier 3 remains**
-(5 element-level methods).
+tracks + 5 closing project-library lifecycle + 5 closing Tier 3 element ops +
+`insert-captions-as-text-track` closing the one direct-bypass call site that was a
+genuine gap rather than an intentional direct-manipulation boundary). **Every
+manager-level mutating method and every UI-triggerable operation with no browser-event
+dependency identified in this audit now has Action coverage.**
 
-## Next (1b)
-Only Tier 3 left: `insertElement`, `updateElementTrim`, `updateElementRetime`,
-`moveElements`, `updateElements`. Closing these completes Goal 1b entirely.
+## What's left before Goal 1's overall done-when is fully met
+Two things, both deliberate, both documented above rather than silently left open:
+1. **Media import has no Action** (`add-media-asset` doesn't exist) — real gap, needs a
+   design call on what an agent hands over (asset object / URL / path), best made as part
+   of Goal 2a's headless invocation contract rather than bolted on here.
+2. `use-paste-media.ts` and `drag-drop-controller.ts` will keep calling
+   Commands/managers directly even after (1) is resolved, since they're inherently
+   browser-event-driven — that's correct, not a lingering bypass, and doesn't block
+   Goal 1b's accept criteria on its own.

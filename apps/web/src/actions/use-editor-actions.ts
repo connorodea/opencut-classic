@@ -26,6 +26,7 @@ import {
 	type ScopeEntry,
 } from "@/selection/scope";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
+import { insertCaptionChunksAsTextTrack } from "@/subtitles/insert";
 
 export function useEditorActions() {
 	const editor = useEditor();
@@ -895,6 +896,81 @@ export function useEditorActions() {
 		"close-project",
 		() => {
 			editor.project.closeProject();
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"insert-element",
+		(args) => {
+			if (!args) return;
+			editor.timeline.insertElement({
+				element: args.element,
+				placement: args.placement,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-element-trim",
+		(args) => {
+			if (!args) return;
+			editor.timeline.updateElementTrim({
+				elementId: args.elementId,
+				trimStart: args.trimStart,
+				trimEnd: args.trimEnd,
+				startTime: args.startTime,
+				duration: args.duration,
+				pushHistory: args.pushHistory,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-element-retime",
+		(args) => {
+			if (!args) return;
+			editor.timeline.updateElementRetime({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				retime: args.retime,
+				pushHistory: args.pushHistory,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"move-elements",
+		(args) => {
+			if (!args) return;
+			editor.timeline.moveElements({
+				moves: args.moves,
+				createTracks: args.createTracks,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-elements",
+		(args) => {
+			if (!args) return;
+			editor.timeline.updateElements({
+				updates: args.updates,
+				pushHistory: args.pushHistory,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"insert-captions-as-text-track",
+		(args) => {
+			if (!args) return;
+			insertCaptionChunksAsTextTrack({ editor, captions: args.captions });
 		},
 		undefined,
 	);

@@ -380,6 +380,42 @@ export const ACTIONS = {
 		description: "Close the active project without deleting it",
 		category: "project",
 	},
+	"insert-element": {
+		description: "Insert a new element onto the timeline",
+		category: "editing",
+		args: { element: "object", placement: "object" },
+	},
+	"update-element-trim": {
+		description: "Trim a clip's in/out point",
+		category: "editing",
+		args: {
+			elementId: "string",
+			trimStart: "number",
+			trimEnd: "number",
+			startTime: "number",
+			duration: "number",
+		},
+	},
+	"update-element-retime": {
+		description: "Change a clip's playback speed/retiming",
+		category: "editing",
+		args: { trackId: "string", elementId: "string", retime: "object" },
+	},
+	"move-elements": {
+		description: "Move one or more elements to a new track/time",
+		category: "editing",
+		args: { moves: "object[]", createTracks: "object[]" },
+	},
+	"update-elements": {
+		description: "Batch-update properties on one or more elements",
+		category: "editing",
+		args: { updates: "object[]" },
+	},
+	"insert-captions-as-text-track": {
+		description: "Insert a list of caption cues as a new text track",
+		category: "editing",
+		args: { captions: "object[]" },
+	},
 } as const satisfies Record<string, TActionBaseDefinition>;
 
 export type TAction = keyof typeof ACTIONS;

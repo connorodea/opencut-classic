@@ -10,7 +10,13 @@ import type {
 } from "@/animation/types";
 import type { MediaTime } from "@/wasm";
 import type { ElementBounds } from "@/preview/element-bounds";
-import type { Bookmark, TrackType } from "@/timeline";
+import type { Bookmark, TrackType, RetimeConfig, TimelineElement } from "@/timeline";
+import type { InsertElementParams } from "@/commands/timeline/element/insert-element";
+import type {
+	PlannedElementMove,
+	PlannedTrackCreation,
+} from "@/timeline/group-move";
+import type { SubtitleCue } from "@/subtitles/types";
 import type { TAction } from "./definitions";
 
 export type { TAction };
@@ -116,6 +122,34 @@ export type TActionArgsMap = {
 	"duplicate-projects": { ids: string[] };
 	"delete-projects": { ids: string[] };
 	"update-project-thumbnail": { thumbnail: string };
+	"insert-element": InsertElementParams;
+	"update-element-trim": {
+		elementId: string;
+		trimStart: MediaTime;
+		trimEnd: MediaTime;
+		startTime?: MediaTime;
+		duration?: MediaTime;
+		pushHistory?: boolean;
+	};
+	"update-element-retime": {
+		trackId: string;
+		elementId: string;
+		retime?: RetimeConfig;
+		pushHistory?: boolean;
+	};
+	"move-elements": {
+		moves: PlannedElementMove[];
+		createTracks?: PlannedTrackCreation[];
+	};
+	"update-elements": {
+		updates: Array<{
+			trackId: string;
+			elementId: string;
+			patch: Partial<TimelineElement>;
+		}>;
+		pushHistory?: boolean;
+	};
+	"insert-captions-as-text-track": { captions: SubtitleCue[] };
 };
 
 type TKeysWithValueUndefined<T> = {
