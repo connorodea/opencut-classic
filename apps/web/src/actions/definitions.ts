@@ -11,7 +11,8 @@ export type TActionCategory =
 	| "controls"
 	| "assets"
 	| "project"
-	| "effects";
+	| "effects"
+	| "keyframes";
 
 export interface TActionBaseDefinition {
 	description: string;
@@ -212,6 +213,67 @@ export const ACTIONS = {
 			elementId: "string",
 			effectId: "string",
 			params: "object",
+		},
+	},
+	"upsert-keyframe": {
+		description: "Create or update a keyframe on an animated element property",
+		category: "keyframes",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			propertyPath: "string",
+			time: "number",
+			value: "unknown",
+			interpolation: "string",
+			keyframeId: "string",
+		},
+	},
+	"retime-keyframe": {
+		description: "Move a keyframe to a new time",
+		category: "keyframes",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			propertyPath: "string",
+			keyframeId: "string",
+			time: "number",
+		},
+	},
+	"update-keyframe-curve": {
+		description: "Update a keyframe's easing/curve on a scalar animated property",
+		category: "keyframes",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			propertyPath: "string",
+			componentKey: "string",
+			keyframeId: "string",
+			patch: "object",
+		},
+	},
+	"upsert-effect-param-keyframe": {
+		description: "Create or update a keyframe on an effect's parameter",
+		category: "keyframes",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			effectId: "string",
+			paramKey: "string",
+			time: "number",
+			value: "number",
+			interpolation: "string",
+			keyframeId: "string",
+		},
+	},
+	"remove-effect-param-keyframe": {
+		description: "Remove a keyframe from an effect's parameter",
+		category: "keyframes",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			effectId: "string",
+			paramKey: "string",
+			keyframeId: "string",
 		},
 	},
 } as const satisfies Record<string, TActionBaseDefinition>;

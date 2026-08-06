@@ -2,7 +2,13 @@ import type { MutableRefObject } from "react";
 import type { FrameRate } from "opencut-wasm";
 import type { ExportFormat, ExportQuality } from "@/export";
 import type { TProjectSettings } from "@/project/types";
-import type { ParamValues } from "@/params";
+import type { ParamValues, ParamValue } from "@/params";
+import type {
+	AnimationPath,
+	AnimationInterpolation,
+	ScalarCurveKeyframePatch,
+} from "@/animation/types";
+import type { MediaTime } from "@/wasm";
 import type { TAction } from "./definitions";
 
 export type { TAction };
@@ -41,6 +47,47 @@ export type TActionArgsMap = {
 		elementId: string;
 		effectId: string;
 		params: Partial<ParamValues>;
+	};
+	"upsert-keyframe": {
+		trackId: string;
+		elementId: string;
+		propertyPath: AnimationPath;
+		time: MediaTime;
+		value: ParamValue;
+		interpolation?: AnimationInterpolation;
+		keyframeId?: string;
+	};
+	"retime-keyframe": {
+		trackId: string;
+		elementId: string;
+		propertyPath: AnimationPath;
+		keyframeId: string;
+		time: MediaTime;
+	};
+	"update-keyframe-curve": {
+		trackId: string;
+		elementId: string;
+		propertyPath: AnimationPath;
+		componentKey: string;
+		keyframeId: string;
+		patch: ScalarCurveKeyframePatch;
+	};
+	"upsert-effect-param-keyframe": {
+		trackId: string;
+		elementId: string;
+		effectId: string;
+		paramKey: string;
+		time: MediaTime;
+		value: number;
+		interpolation?: "linear" | "hold";
+		keyframeId?: string;
+	};
+	"remove-effect-param-keyframe": {
+		trackId: string;
+		elementId: string;
+		effectId: string;
+		paramKey: string;
+		keyframeId: string;
 	};
 };
 

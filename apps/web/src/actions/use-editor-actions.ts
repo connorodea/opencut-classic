@@ -641,4 +641,70 @@ export function useEditorActions() {
 		},
 		undefined,
 	);
+
+	useActionHandler(
+		"upsert-keyframe",
+		(args) => {
+			if (!args) return;
+			editor.timeline.upsertKeyframes({ keyframes: [args] });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"retime-keyframe",
+		(args) => {
+			if (!args) return;
+			editor.timeline.retimeKeyframe({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				propertyPath: args.propertyPath,
+				keyframeId: args.keyframeId,
+				time: args.time,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-keyframe-curve",
+		(args) => {
+			if (!args) return;
+			editor.timeline.updateKeyframeCurves({ keyframes: [args] });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"upsert-effect-param-keyframe",
+		(args) => {
+			if (!args) return;
+			editor.timeline.upsertEffectParamKeyframe({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				effectId: args.effectId,
+				paramKey: args.paramKey,
+				time: args.time,
+				value: args.value,
+				interpolation: args.interpolation,
+				keyframeId: args.keyframeId,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"remove-effect-param-keyframe",
+		(args) => {
+			if (!args) return;
+			editor.timeline.removeEffectParamKeyframe({
+				trackId: args.trackId,
+				elementId: args.elementId,
+				effectId: args.effectId,
+				paramKey: args.paramKey,
+				keyframeId: args.keyframeId,
+			});
+		},
+		undefined,
+	);
 }
