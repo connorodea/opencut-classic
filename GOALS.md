@@ -3,7 +3,7 @@
 > North star: the video editor where every capability a human can click is also a command
 > an AI agent can call — so DaVinci-grade grading, FCP-grade editing, CapCut-grade social
 > speed, and Descript-grade text editing all become programmable from one core.
-> Source: VISION.md (v2) · _Last updated: 2026-08-06 · Plan version: v1_
+> Source: VISION.md (v3) · _Last updated: 2026-08-06 · Plan version: v1.1_
 
 ## Alignment anchors (every goal must serve these)
 
@@ -211,7 +211,12 @@ on autopilot.
   transcript-driven editing + auto-captioning (Descript/CapCut tier) on the same Action
   surface, then an MCP server once that surface is stable.
 - **Later:** Node-based color grading (DaVinci-grade), Fairlight-grade audio mixing,
-  template ecosystem, desktop parity, plugin system — directional, not yet scoped.
+  template ecosystem, desktop parity, plugin system. **Now scoped in detail** —
+  `DAVINCI_PARITY.md` breaks this into 5 phases (color foundation → audio foundation →
+  compositing/VFX foundation → export hardening → Studio-tier stretch) with FOSS
+  accelerants and license analysis per phase. Still not started, and still gated behind
+  Goal 3's proof gate per VISION.md — the detail exists so a phase can become a real
+  Goal N (via `/northstar`) the moment it's picked up, not so it jumps the queue.
 
 ## Drift watch
 No existing backlog on this fork yet (brand new — nothing to flag against these goals).
@@ -271,3 +276,7 @@ that VISION.md's Next milestone should not start yet.
 - 2026-08-06 v1 — Initial cascade from VISION.md v2: three goals decomposing the "Now"
   milestone (complete Action API → headless shell → proof gate), tethered to the core
   value prop and the risk named in VISION.md's v2 changelog.
+- 2026-08-06 v1.1 — VISION.md v3 fleshed out the "Later" milestone into
+  `DAVINCI_PARITY.md` (5-phase DaVinci-parity roadmap + FOSS accelerant/license map).
+  Sequencing's Later line now points to it. No change to the active Goal 1–3 cascade or
+  Goal 3's gate — Later stays Later until Goal 3 passes.

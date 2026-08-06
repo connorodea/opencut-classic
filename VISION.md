@@ -2,7 +2,7 @@
 
 > One-sentence north star: the video editor where every capability a human can click is also a command an AI agent can call — so DaVinci-grade grading, FCP-grade editing, CapCut-grade social speed, and Descript-grade text editing all become programmable from one core.
 
-_Last updated: 2026-08-06 · Version: v2_
+_Last updated: 2026-08-06 · Version: v3_
 
 ## What it is
 An open-source video editor, forked-in-place from `opencut-classic` (MIT), that combines
@@ -138,7 +138,9 @@ is non-negotiable, not a suggestion.
 - **Next:** Layer in transcript-driven editing and auto-captioning (Descript/CapCut tier) on
   the same Action surface; ship an MCP server on top of the now-stable Action API.
 - **Later:** Node-based color grading (DaVinci-grade) and Fairlight-grade audio mixing;
-  template ecosystem and social export presets; desktop parity; plugin system.
+  template ecosystem and social export presets; desktop parity; plugin system. Fleshed
+  out into a full 5-phase roadmap with FOSS accelerants and license analysis — see
+  `DAVINCI_PARITY.md`.
 
 ## How to decompose this
 Once this direction is confirmed, run `/todoist` from this project directory to create its
@@ -169,3 +171,13 @@ grading, audio) becomes its own goal once "Now" is done.
   Added an explicit named risk (stalling at automation-API-complete/feature-thin) with a
   non-negotiable proof gate between Now and Next. Product name and agent-transport
   (MCP vs REST/CLI) remain open.
+- 2026-08-06 v3 — Fleshed out the "Later" milestone's DaVinci-grade color/audio/VFX
+  ambition into `DAVINCI_PARITY.md`: a full DaVinci Resolve feature inventory (all 7
+  workspace pages + cross-cutting systems + Free/Studio tier analysis), a 5-phase
+  roadmap (color → audio → compositing → export hardening → Studio-tier stretch), and a
+  license-vetted FOSS accelerant map per phase (this project is MIT — several strong
+  candidates, e.g. FFmpeg and Faust, are LGPL and need build-flag/usage discipline;
+  x264/x265/Natron/Ardour/Kdenlive-class projects are GPL/AGPL and reference-only).
+  Reaffirms the core-value-prop framing: every new capability must also become a
+  registered Action, not just a UI feature — feature parity is raw material for the
+  agent-control differentiator, not a competing goal.
