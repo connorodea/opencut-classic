@@ -3,7 +3,7 @@
 > North star: the video editor where every capability a human can click is also a command
 > an AI agent can call — so DaVinci-grade grading, FCP-grade editing, CapCut-grade social
 > speed, and Descript-grade text editing all become programmable from one core.
-> Source: VISION.md (v3) · _Last updated: 2026-08-06 · Plan version: v1.1_
+> Source: VISION.md (v3) · _Last updated: 2026-08-06 · Plan version: v2_
 
 ## Alignment anchors (every goal must serve these)
 
@@ -19,14 +19,18 @@
 - Augment the expert editor, don't replace them.
 
 **Non-goals (out of scope now):** plugin marketplace, mobile app, matching the rewrite's
-Rust-core Editor API 1:1, node-based color grading, Fairlight-grade audio mixing,
+Rust-core Editor API 1:1, Fairlight-grade audio mixing, node-based VFX/compositing,
 transcript-driven editing, templates/social export layer, MCP server, desktop (GPUI)
-parity.
+parity. (Node-based color grading was on this list until Goal 4 — see below.)
 
 **MVP boundary:** In = fork classic (done), a complete + documented Action API covering
 every current UI-triggerable operation, and headless invocation sufficient for a script to
 produce a real, finished edit end-to-end with zero GUI. Out = everything in the non-goals
-list above, deferred to VISION.md's Next/Later milestones.
+list above, deferred to VISION.md's Next/Later milestones. **Explicit exception:** Goal 4
+(color grading foundation, `DAVINCI_PARITY.md` Phase 1) is Later-milestone work pulled
+forward ahead of Goal 3's proof gate on direct user instruction ("execute," given
+immediately after reviewing the phased roadmap) — recorded here as a conscious MVP-
+boundary override, not a silent redefinition of what "MVP" means going forward.
 
 ## Goals
 
@@ -142,11 +146,17 @@ above gets built. See `HEADLESS_DESIGN.md` v1.5 for the full chain and evidence.
   2b: `SaveManager`'s 800ms debounced auto-save means a one-shot script must explicitly
   `save-project` and wait before exit; `RendererManager`/`AudioManager`/`toast` calls are
   unverified outside a browser and need a smoke test, not an assumption either way.
-- [ ] **2b** Implement the headless shell as a new thin shell alongside `apps/web` and
+- [x] **2b** Implement the headless shell as a new thin shell alongside `apps/web` and
   `apps/desktop`, calling the same Action layer Goal 1 completed — no parallel/duplicate
   logic — _advances:_ the Action-layer-stays-source-of-truth principle — _accept:_ the
   shell loads a real project, invokes at least one Action end-to-end, and persists the
-  result correctly. **Started 2026-08-06, blocked partway through — see
+  result correctly. **Done 2026-08-06** — the account below (started, hit the WASM
+  blocker, fixed it, then found the deeper WebGPU rendering gap) is kept in full as the
+  real record, but the final state is: `apps/web/src/actions/handlers.ts` extracts the
+  ~39 thin-wrapper Actions into plain functions shared between the React hook and the
+  headless runner, and `apps/web/headless/run.ts` dispatches real named Actions (not
+  manager-method shortcuts) from a `steps.json` file — verified end-to-end, satisfying
+  2b's accept criteria exactly as written. **Started 2026-08-06, blocked partway through — see
   `HEADLESS_DESIGN.md`'s v1.1 correction.** Storage layer is done and verified for real
   (`FileSystemAdapter`/`FileSystemBlobAdapter`, `StorageService` branches on environment;
   a standalone script round-tripped set/get/list/getAll/remove/clear against real files
@@ -179,11 +189,12 @@ above gets built. See `HEADLESS_DESIGN.md` v1.5 for the full chain and evidence.
   first baseline, unrelated to headless work, just never hit until `loadProject` was
   actually exercised outside a browser). `v1-to-v2.ts` has the same bug in 3 more spots,
   left unfixed — legacy-migration-only, out of scope for this pass.
-  **Precision note**: the proof calls `editor.project.updateSettings(...)` (the manager
-  method) directly, not through `invokeAction`— so what's proven is that `EditorCore` +
-  persistence work headlessly at all, not yet that a registered Action does. 2b's actual
-  accept criteria (invoke an Action end-to-end) still needs the handler-extraction work
-  below before it's genuinely met.
+  **Precision note (resolved)**: at this point in the work, the proof only called
+  `editor.project.updateSettings(...)` (the manager method) directly, not through
+  `invokeAction` — proving `EditorCore` + persistence work headlessly, not yet that a
+  registered Action does. The handler-extraction work above closed that gap for real;
+  2b's actual accept criteria (invoke an Action end-to-end) is now genuinely met, not
+  just the bootstrapping prerequisite.
 
 ### Goal 3 — A real headless edit proves the Action API is valuable, not just complete · serves: mitigates VISION.md's named risk (stalling at automation-API-complete/feature-thin)
 **Done when:** a real, non-toy scripted/agentic edit is produced entirely through the
@@ -204,19 +215,68 @@ auto-captions, MCP server) does not start until Goal 3 passes. If it doesn't pas
 signal the problem is feature depth, not API completeness — revisit scope, don't proceed
 on autopilot.
 
+### Goal 4 — Color grading foundation is a documented, agent-drivable Action surface · serves: core value prop ("DaVinci-grade grading" from the north star, "UI is just one client of the control surface" pillar)
+**Done when:** primary wheels, log wheels, RGB/luma curves, HSL/RGB/luma qualifiers, a
+basic serial+parallel node graph, and LUT (1D/3D `.cube`) import/apply can all be built
+on a clip entirely through registered Actions, with grading state correctly persisted
+and headlessly verifiable — the same rigor `GAP_MAP.md` established for Goal 1. Scopes
+(waveform/vectorscope/histogram/parade) exist as verification tooling, with their own
+pixel-level correctness explicitly gated on the still-unresolved WebGPU rendering
+blocker, not assumed solved.
+
+**Status:** todo — started 2026-08-06. **Explicit sequencing override, recorded rather
+than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
+both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
+gated behind Goal 3 passing, and Goal 3 has not passed — it's still blocked on a
+human-supplied real edit scenario (see Goal 3's status above, unchanged by this). The
+user said "execute" immediately after reviewing the phased DaVinci roadmap; treated as
+direct, explicit authorization to start Phase 1 now, overriding the stated gate for this
+one goal. This does not lift the gate for Phases 2–5 or for Goal 3 itself — each future
+Later-phase start needs its own explicit go-ahead the same way, not an implied blanket
+release once one override happens.
+
+**Sub-goals:**
+- [ ] **4a** Audit `DAVINCI_PARITY.md`'s Phase 1 scope against the current codebase,
+  design the grading data model (where grade state lives — a new field set on
+  `TimelineElement`? a parallel `Command`/`Manager` pair mirroring how effects work?
+  what shape do primary/curve/qualifier/node/LUT data take?), and produce a gap-map the
+  same way `GAP_MAP.md` did for Goal 1 — _advances:_ makes the real shape of the work
+  visible before building it, avoiding Goal 1's own early under-scoping mistake (the
+  original v0.1 gap-map missed 3 methods) — _accept:_ a written design + gap-map
+  covering every Phase 1 item from `DAVINCI_PARITY.md`, each tagged with its target
+  Action name(s) and whether it needs new data-model work or fits the existing
+  `add-clip-effect`-style granular-Action pattern directly.
+- [ ] **4b** Close every gap from 4a, subsystem by subsystem in `DAVINCI_PARITY.md`'s
+  listed order (primary/log wheels → curves → qualifiers → node graph → LUTs → scopes)
+  — register each Action per `docs/actions.md`, verify headlessly via
+  `apps/web/headless/run.ts` using state-persistence checks (create/mutate/save/reload/
+  confirm), not rendered-output checks, since `HEADLESS_DESIGN.md` v1.5's WebGPU gap
+  blocks real rendering — _advances:_ completes Phase 1's Action surface — _accept:_
+  gap-map re-run shows zero remaining gaps for Phase 1's defined scope; scopes
+  specifically get flagged as state-only-verified (UI/wiring done, pixel-correctness
+  blocked on WebGPU) rather than marked fully done — don't let a scope's accept
+  criteria quietly assume rendering works, the same discipline Goal 2's `export-project`
+  check applied.
+
+**Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
+`DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via
+state persistence), re-run the gap-map, report the new count. Stop when the gap-map
+shows zero remaining gaps for Phase 1's scope, or a real blocker is hit and documented
+(the way Goal 2 documented the WebGPU blocker) rather than silently worked around.
+
 ## Sequencing
 - **Now:** Goal 1 → Goal 2 → Goal 3, in that order (each unblocks the next). This whole
-  cluster **is** VISION.md's "Now" milestone, decomposed.
+  cluster **is** VISION.md's "Now" milestone, decomposed. **Goal 4 runs alongside/ahead
+  of Goal 3** as an explicit, recorded override (see Goal 4's status) — this is not a
+  reordering of the Now cluster itself, Goal 3's gate is unchanged for everything after it.
 - **Next:** Not yet decomposed into goals — opens only after Goal 3 passes. Per VISION.md:
   transcript-driven editing + auto-captioning (Descript/CapCut tier) on the same Action
   surface, then an MCP server once that surface is stable.
-- **Later:** Node-based color grading (DaVinci-grade), Fairlight-grade audio mixing,
-  template ecosystem, desktop parity, plugin system. **Now scoped in detail** —
-  `DAVINCI_PARITY.md` breaks this into 5 phases (color foundation → audio foundation →
-  compositing/VFX foundation → export hardening → Studio-tier stretch) with FOSS
-  accelerants and license analysis per phase. Still not started, and still gated behind
-  Goal 3's proof gate per VISION.md — the detail exists so a phase can become a real
-  Goal N (via `/northstar`) the moment it's picked up, not so it jumps the queue.
+- **Later:** Fairlight-grade audio mixing, node-based VFX/compositing, template
+  ecosystem, desktop parity, plugin system — `DAVINCI_PARITY.md` Phases 2–5. Scoped in
+  detail (5 phases with FOSS accelerants and license analysis), not started, still gated
+  behind Goal 3's proof gate — Goal 4's override is scoped to Phase 1 only, not a
+  blanket release for the rest.
 
 ## Drift watch
 No existing backlog on this fork yet (brand new — nothing to flag against these goals).
@@ -272,6 +332,33 @@ recorded, not assumed. This is a gate — if it doesn't pass, report that plainl
 that VISION.md's Next milestone should not start yet.
 ```
 
+**/goal — Goal 4:**
+```text
+/goal Goal 4: Color grading foundation is a documented, agent-drivable Action surface
+Serves vision pillar: DaVinci-grade grading, "the UI is just one client of the control
+surface." Done when: primary/log wheels, curves, HSL/RGB/luma qualifiers, a basic node
+graph, and LUT import/apply are all built entirely through registered Actions, verified
+headlessly via state persistence (not rendering — HEADLESS_DESIGN.md v1.5's WebGPU gap
+blocks that). Non-goals: tracked Power Windows, HDR grading, Face Refinement, temporal
+noise reduction, full ACES/DaVinci Wide Gamut, stereo 3D — DAVINCI_PARITY.md Phase 1
+scope only. Read GOALS.md + DAVINCI_PARITY.md + HEADLESS_DESIGN.md first.
+Acceptance checks: gap-map (4a) shows zero remaining Phase-1 gaps after 4b; every new
+Action documented per docs/actions.md; scopes flagged state-only-verified, not claimed
+fully done. Report what shipped + what's left.
+```
+
+**/loop — Goal 4 (gap closure):**
+```text
+/loop Goal 4 — close color-grading Action gaps
+Each cycle: re-read the current gap-map (4a), pick the next open gap in
+DAVINCI_PARITY.md's Phase 1 order (wheels → curves → qualifiers → node graph → LUTs →
+scopes), close it (register the Action per docs/actions.md, verify headlessly via
+apps/web/headless/run.ts using state-persistence checks), re-run the gap-map, report the
+new count.
+Stop when: gap-map shows zero remaining Phase-1 gaps, or a real blocker is hit and
+documented rather than worked around. Don't repeat already-closed gaps.
+```
+
 ## Changelog
 - 2026-08-06 v1 — Initial cascade from VISION.md v2: three goals decomposing the "Now"
   milestone (complete Action API → headless shell → proof gate), tethered to the core
@@ -280,3 +367,13 @@ that VISION.md's Next milestone should not start yet.
   `DAVINCI_PARITY.md` (5-phase DaVinci-parity roadmap + FOSS accelerant/license map).
   Sequencing's Later line now points to it. No change to the active Goal 1–3 cascade or
   Goal 3's gate — Later stays Later until Goal 3 passes.
+- 2026-08-06 v2 — Added Goal 4 (color grading foundation, `DAVINCI_PARITY.md` Phase 1),
+  cascaded via `/northstar` on explicit user instruction ("execute," immediately after
+  reviewing the phased roadmap) — a deliberate, recorded override of the Goal-3-gate
+  this document itself states, scoped to Phase 1 only. Removed "node-based color
+  grading" from the Non-goals list (now in scope via Goal 4); added an explicit
+  MVP-boundary exception note rather than quietly redefining what MVP means. Also fixed
+  a document-integrity gap found while refreshing: Goal 2's sub-goal 2b was still marked
+  `[ ]` with stale mid-progress detail text, even though Goal 2's own top-level status
+  had already recorded it done — checkbox and detail now match the real final state
+  (handler-extraction + `run.ts` real-Action dispatch, verified).
