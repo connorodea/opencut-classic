@@ -5,7 +5,16 @@
 > MCP-vs-REST (that's VISION.md's Next milestone) — this is the invocation contract
 > underneath whatever agent-facing protocol comes later.
 
-_2026-08-06 · v1.4 — **Goal 2b's actual accept criteria is now met, precisely as
+_2026-08-06 · v1.6 — **Major update to the v1.5 WebGPU finding: native Rust wgpu has
+real, working GPU access on this machine (verified via `cargo test`), completely
+separate from the browser/WASM limitation.** `GpuContext::new()` (`rust/crates/gpu`) is
+cfg-gated — the `wasm32` build path goes through browser WebGPU (blocked, as v1.5
+found), but the *native* build path uses `wgpu::Instance`/`Adapter` against the OS
+graphics API directly (Metal on macOS) and it works. This doesn't undo v1.5's finding
+about Bun/browser WebGPU — it adds a fourth, verified-real fix option: a native Rust
+renderer process invoked from the headless Bun runner, instead of relying on the
+WASM-in-Bun compositor for pixel rendering. See the v1.6 section below. v1.4's original
+summary follows, still accurate for what it covers: 2b's actual accept criteria is now met, precisely as
 written**, not just its bootstrapping prerequisite. v1.1–v1.3 got `EditorCore` +
 persistence running headlessly at all; v1.4 extracts the Action-layer handlers into
 `apps/web/src/actions/handlers.ts` and adds `apps/web/headless/run.ts`, a real runner
@@ -430,6 +439,57 @@ scenario doesn't require a rendered preview/export (edit-only, verified by inspe
 the saved project state), or this gap gets closed first. Not deciding which — that's
 exactly the kind of call this document has repeatedly said isn't mine to make alone.
 
+## v1.6 — native Rust wgpu has real GPU access; a fourth fix path, verified not assumed
+
+Found while auditing Goal 4's (color grading) rendering requirements — the same
+question v1.5 answered for the browser/WASM path turns out to have a different answer
+for native Rust.
+
+**What was checked, and how:** `GpuContext::new()` (`rust/crates/gpu/src/context.rs`)
+is `cfg`-gated on `target_arch = "wasm32"`. The `wasm32` path calls into browser WebGPU
+via `wasm-bindgen` (`navigator.gpu.requestAdapter()`, effectively — this is what v1.5
+found blocked). The **non-wasm32 path uses `wgpu::Instance`/`Adapter` directly against
+the OS graphics API** — Metal on macOS, a completely separate code path from anything
+browser-related. Wrote a real test, not a guess: `rust/crates/gpu/tests/
+adapter_availability.rs`, calling `GpuContext::new()` via `pollster::block_on` and
+asserting success. `cargo test -p gpu --test adapter_availability` — **passes.** Native
+GPU access genuinely works on this machine right now.
+
+**Also verified the build toolchain end-to-end, not assumed working from the README:**
+`wasm-pack` wasn't installed; installed it (`brew install wasm-pack`), then ran the
+repo's own documented build command (`bun run build:wasm`, which is `wasm-pack build
+rust/wasm --target bundler --out-dir pkg`) from a clean state. It completed successfully
+in ~1m30s, producing a real `rust/wasm/pkg`. `cargo build --workspace` also succeeds
+cleanly, including `apps/desktop` (a native Rust/gpui shell that already exists in this
+monorepo, found while checking the workspace — out of scope for anything here, noted
+for awareness). Both the WASM build path and the native build path are confirmed real
+and working, not just documented.
+
+**What this changes:** v1.5 listed three fix options for the WebGPU rendering gap, all
+"substantially bigger than a session continuation." This adds a fourth, and it's the
+only one of the four that's already *verified working* rather than theoretical:
+
+1. A native WebGPU binding for Bun/Node — still unverified, still a real undertaking.
+2. A CPU/software rendering fallback in the Rust engine — still unattempted, still
+   upstream-engine-sized work.
+3. A GPU-capable browser host for headless Chrome — v1.5 additionally found this
+   session's own sandboxed Playwright environment doesn't have one either.
+4. **A native Rust renderer, invoked from the headless Bun runner as a subprocess (or
+   via FFI), instead of relying on the WASM-in-Bun compositor for actual pixel
+   rendering — confirmed to have real, working GPU access today.** This doesn't require
+   solving browser/Bun WebGPU at all; it sidesteps the whole problem by doing the
+   rendering natively and handing the result (a rendered frame buffer, or a fully
+   encoded export) back to the Bun-orchestrated headless flow.
+
+**Not decided or implemented — this is a finding, not a completed fix.** Option 4 is a
+real architecture decision (a new binary/crate exposing a render/export entry point,
+some IPC or subprocess-invocation design, and reconciling it with the "single-process
+script" transport decision in section 2 above — does the native renderer become part of
+that one process's toolchain, or a second process the script shells out to for just the
+render step?). Recording it here because it changes what's worth attempting next on the
+rendering gap from "nothing verified, all paths equally speculative" to "one path is
+empirically real, worth designing toward first."
+
 ## Bonus finding — the WASM plugin also unblocks `bun test`
 
 Not part of Goal 2, noted because it was a genuine surprise found while sanity-checking
@@ -460,3 +520,9 @@ scope, that means picking a concrete edit scenario using only the ~39 headless-r
 Actions above (no playback/selection-dependent UI actions needed for a scripted,
 non-interactive edit), not extracting the remaining 30 first unless Goal 3's actual
 scenario turns out to need one of them.
+
+Separately (Goal 4, `DAVINCI_PARITY.md` Phase 1, started as an explicit override — see
+`GOALS.md`): if real rendered verification becomes necessary before Goal 3 does, v1.6's
+native-Rust-renderer path is the one candidate fix worth designing toward first, since
+it's the only one of the four options that's actually confirmed working rather than
+theoretical.
