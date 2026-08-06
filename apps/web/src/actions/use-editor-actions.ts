@@ -537,4 +537,41 @@ export function useEditorActions() {
 		},
 		undefined,
 	);
+
+	useActionHandler(
+		"create-project",
+		(args) => {
+			if (!args) return;
+			// Fire-and-forget, like export-project: the new project's id/state
+			// is observed via editor.project.getActive() after this resolves.
+			void editor.project.createNewProject({ name: args.name });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"load-project",
+		(args) => {
+			if (!args) return;
+			void editor.project.loadProject({ id: args.id });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"save-project",
+		() => {
+			void editor.project.saveCurrentProject();
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-project-settings",
+		(args) => {
+			if (!args) return;
+			editor.project.updateSettings({ settings: args.settings });
+		},
+		undefined,
+	);
 }

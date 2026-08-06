@@ -159,6 +159,25 @@ export const ACTIONS = {
 			includeAudio: "boolean",
 		},
 	},
+	"create-project": {
+		description: "Create a new project and make it active",
+		category: "project",
+		args: { name: "string" },
+	},
+	"load-project": {
+		description: "Load an existing project by id and make it active",
+		category: "project",
+		args: { id: "string" },
+	},
+	"save-project": {
+		description: "Save the active project",
+		category: "project",
+	},
+	"update-project-settings": {
+		description: "Update the active project's settings (fps, canvas size, background, etc.)",
+		category: "project",
+		args: { settings: "object" },
+	},
 } as const satisfies Record<string, TActionBaseDefinition>;
 
 export type TAction = keyof typeof ACTIONS;

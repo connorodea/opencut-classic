@@ -5,7 +5,7 @@
 > invoked through `EditorCore`'s three managers — `TimelineManager`, `ScenesManager`,
 > `ProjectManager` — via a shared `CommandManager` with undo/redo).
 
-_Last updated: 2026-08-06 · v0.1_
+_Last updated: 2026-08-06 · v0.2_
 
 ## Architecture found
 
@@ -37,13 +37,19 @@ using only the registered Actions cannot currently do any of it.
 Ranked by value (most consequential capability gap first).
 
 ### Tier 1 — critical (core value prop unusable without these)
-| Manager method | What it does | Why it matters |
-|---|---|---|
-| `ProjectManager.export` | Render/export the final video | **The single terminal operation of a video editor.** An agent cannot currently produce an actual output file through the Action API — everything else is edit-time-only. |
-| `ProjectManager.createNewProject` | Start a new project | An agent can't even begin a project headlessly. |
-| `ProjectManager.loadProject` | Open an existing project | Same — no entry point into an existing project. |
-| `ProjectManager.saveCurrentProject` | Persist current state | No way to durably save agent-driven edits. |
-| `ProjectManager.updateSettings` | Project-level settings (fps, resolution, etc.) | No way to configure a project's output parameters. |
+**Status: closed.** All five now have a registered Action (`export-project`,
+`create-project`, `load-project`, `save-project`, `update-project-settings`), each a
+thin fire-and-forget wrapper matching the existing action-handler signature; state
+(new project id, active project, settings) is observed via `editor.project.getActive()`
+after the action resolves, same pattern as `export-project`'s `getExportState()`.
+
+| Manager method | What it does | Why it matters | Closed by |
+|---|---|---|---|
+| `ProjectManager.export` | Render/export the final video | **The single terminal operation of a video editor.** An agent cannot currently produce an actual output file through the Action API — everything else is edit-time-only. | `export-project` |
+| `ProjectManager.createNewProject` | Start a new project | An agent can't even begin a project headlessly. | `create-project` |
+| `ProjectManager.loadProject` | Open an existing project | Same — no entry point into an existing project. | `load-project` |
+| `ProjectManager.saveCurrentProject` | Persist current state | No way to durably save agent-driven edits. | `save-project` |
+| `ProjectManager.updateSettings` | Project-level settings (fps, resolution, etc.) | No way to configure a project's output parameters. | `update-project-settings` |
 
 ### Tier 2 — whole subsystems with zero coverage
 | Subsystem | Manager methods with no Action | Impact |
@@ -96,11 +102,10 @@ pan) — per VISION.md's MVP boundary these are lower value for agent control an
 deliberately out of scope for Goal 1 unless a Goal 3 proof scenario surfaces a real need.
 
 ## Gap count
-**30 registered Actions. ~38 manager-level mutating methods identified. ~12 have any
-Action coverage (some only partial, via a switch-branch inside a broader action). ~26
-methods have zero Action coverage**, including the single highest-value one (`export`).
+34 registered Actions (30 original + 4 added closing Tier 1). ~38 manager-level mutating
+methods identified. ~17 now have Action coverage. **~21 methods still have zero Action
+coverage** — all of Tier 2 and Tier 3 below.
 
 ## Next (1b)
-Close gaps in the Tier 1 → Tier 2 → Tier 3 order above. `export` should be the very
-first Action registered — closing it alone makes a real headless edit (Goal 3) newly
-possible in a way none of the other gaps individually unlock.
+Tier 1 is closed. Continue in Tier 2 → Tier 3 order. Tier 2's highest-leverage subsystem
+is effects (DaVinci/CapCut-tier capability named directly in VISION.md) — start there.

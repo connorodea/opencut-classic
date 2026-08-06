@@ -1,6 +1,7 @@
 import type { MutableRefObject } from "react";
 import type { FrameRate } from "opencut-wasm";
 import type { ExportFormat, ExportQuality } from "@/export";
+import type { TProjectSettings } from "@/project/types";
 import type { TAction } from "./definitions";
 
 export type { TAction };
@@ -18,6 +19,9 @@ export type TActionArgsMap = {
 		fps?: FrameRate;
 		includeAudio?: boolean;
 	};
+	"create-project": { name: string };
+	"load-project": { id: string };
+	"update-project-settings": { settings: Partial<TProjectSettings> };
 };
 
 type TKeysWithValueUndefined<T> = {
