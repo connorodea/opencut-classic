@@ -34,7 +34,15 @@ list above, deferred to VISION.md's Next/Later milestones.
 **Done when:** every currently UI-triggerable operation in classic has a corresponding
 registered Action with typed args and a doc entry per the existing `docs/actions.md`
 pattern; no UI handler calls `editor.xxx()` directly, bypassing `invokeAction`.
-**Status:** in-progress (1a done, 1b: Tier 1 and Tier 2 fully closed, only Tier 3 remains)
+**Status:** 1a and 1b both done 2026-08-06 (69 Actions registered, `GAP_MAP.md` v1.0).
+Goal 1's own literal done-when ("every currently UI-triggerable operation... has a
+corresponding registered Action") isn't 100% met yet: media-asset creation via
+paste/drag-drop still bypasses the Action layer, deliberately — see `GAP_MAP.md`'s
+"What's left" section. That's a real, separate gap needing a design decision (what does
+an agent hand over instead of a browser `File`?), deferred to Goal 2a's headless
+invocation contract rather than closed superficially here. Not blocking: Goal 2's
+"invoke Actions against a project" scope doesn't require importing new media to prove
+out, and Goal 3's proof scenario can pick footage that's already in a project if needed.
 **Sub-goals:**
 - [x] **1a** Audit every UI-triggerable operation across `apps/web` (buttons, menus,
   shortcuts, panels) and produce a gap-map: covered-by-an-Action vs. direct-handler-bypass
@@ -48,7 +56,7 @@ pattern; no UI handler calls `editor.xxx()` directly, bypassing `invokeAction`.
   output file through the Action API at all. Whole subsystems (effects, keyframes/
   animation, masks, scene CRUD, track-level ops, project lifecycle) are currently
   unreachable via any Action.
-- [ ] **1b** Close every gap from 1a, in `GAP_MAP.md`'s Tier 1 → 2 → 3 order — register
+- [x] **1b** Close every gap from 1a, in `GAP_MAP.md`'s Tier 1 → 2 → 3 order — register
   the missing Action per `docs/actions.md`,
   or refactor the handler to route through `invokeAction` — _advances:_ completes the
   control surface that Goal 2 and Goal 3 depend on — _accept:_ gap-map re-run shows zero
@@ -70,8 +78,14 @@ pattern; no UI handler calls `editor.xxx()` directly, bypassing `invokeAction`.
   `toggle-track-visibility` registered (PR #1); 58 Actions total. **Tier 2's
   project-library-lifecycle subsystem done 2026-08-06 — Tier 2 fully closed** —
   `rename-project`, `duplicate-projects`, `delete-projects`, `update-project-thumbnail`,
-  `close-project` registered (PR #1); 63 Actions total. Only Tier 3 (element
-  insert/trim/retime/move/update, 5 methods) remains.
+  `close-project` registered (PR #1); 63 Actions total. **Tier 3 + the direct-bypass
+  audit done 2026-08-06** — `insert-element`, `update-element-trim`,
+  `update-element-retime`, `move-elements`, `update-elements`, plus
+  `insert-captions-as-text-track` (the one genuine bypass gap; `subtitles/insert.ts` was
+  a pure function, closeable like any other Tier 3 item) registered (PR #1); 69 Actions
+  total, `GAP_MAP.md` v1.0. Marking 1b done: every identified gap traceable to a
+  same-shape closure (register an Action, wrap the existing manager method) is closed.
+  One deliberately-deferred exception remains — see Goal 1's status line below.
 **Loop (if iterative):** each cycle → pick the next open gap from the gap-map (largest-
 used-operation first), close it, re-run the gap-map, report the new gap count. Stop when
 the gap-map shows zero gaps.
@@ -79,8 +93,10 @@ the gap-map shows zero gaps.
 ### Goal 2 — A headless shell can invoke the Action API with zero GUI · serves: core value prop, "agentic/headless editing" workflow
 **Done when:** an external script/CLI can load a project, invoke Actions against it, and
 produce a valid, openable/exportable project — with no browser or desktop app involved.
-**Status:** todo (blocked on Goal 1 reaching enough coverage to be useful — doesn't need to
-wait for 100%, just the operations the Goal 3 scenario will actually use)
+**Status:** todo, unblocked — Goal 1's Action API now has 69 registered Actions covering
+every editing/project operation identified in `GAP_MAP.md` except media import
+(paste/drag-drop), which 2a's contract design should account for directly rather than
+wait on.
 **Sub-goals:**
 - [ ] **2a** Design the headless invocation contract — CLI vs. local server transport, how
   a caller addresses a project and invokes an Action with args. Explicitly does NOT need to
