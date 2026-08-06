@@ -367,6 +367,28 @@ headless test project has any — and is a real risk given `RendererManager`'s c
 - `v1-to-v2.ts`'s pre-existing positional-args bug (3 spots) remains unfixed —
   legacy-migration-only, still flagged by `tsc`, still out of scope for this pass.
 
+## Bonus finding — the WASM plugin also unblocks `bun test`
+
+Not part of Goal 2, noted because it was a genuine surprise found while sanity-checking
+the handler-extraction refactor didn't regress anything: running the fork's existing
+`bun test` suite without the plugin hits the *exact same* `wasm.__wbindgen_start is not
+a function` crash this design doc spent v1.1–v1.3 on, in every test file that
+transitively imports anything WASM-touching (`src/timeline/__tests__/
+update-pipeline.test.ts`, `src/masks/__tests__/snap.test.ts`,
+`src/timeline/placement/__tests__/resolve.test.ts`,
+`src/services/storage/migrations/__tests__/v27-to-v28.test.ts` — at least these four).
+Running the same suite with `--preload ./headless/wasm-bindgen-bun-plugin.ts` lets all
+of them actually execute instead of crashing before a single assertion runs. Doing so
+surfaces **4 real test failures that were previously invisible** (masked by the whole
+file crashing): two `Failed to create text measurement context` errors (looks like a
+missing canvas/DOM polyfill in the bare-Bun test environment, separate from this
+design's WASM work), and two numeric-precision/fixture mismatches. Not investigated
+further — real app-code test failures unrelated to headless work are their own
+follow-up, not something to pull into this PR's scope. Flagged here so it isn't lost:
+whoever owns test-suite health next should know `bun test` may have been silently
+non-functional for any WASM-touching file before this plugin existed, independent of
+this document's actual goal.
+
 ## Next
 
 Goal 2b is done. Goal 3 (the proof-gate: a real, non-toy scripted edit, human-approved
