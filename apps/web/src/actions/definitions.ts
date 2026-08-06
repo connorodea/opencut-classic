@@ -13,7 +13,8 @@ export type TActionCategory =
 	| "project"
 	| "effects"
 	| "keyframes"
-	| "masks";
+	| "masks"
+	| "scenes";
 
 export interface TActionBaseDefinition {
 	description: string;
@@ -298,6 +299,41 @@ export const ACTIONS = {
 			canvasPoint: "object",
 			bounds: "object",
 		},
+	},
+	"create-scene": {
+		description: "Create a new scene in the active project",
+		category: "scenes",
+		args: { name: "string", isMain: "boolean" },
+	},
+	"delete-scene": {
+		description: "Delete a scene from the active project",
+		category: "scenes",
+		args: { sceneId: "string" },
+	},
+	"rename-scene": {
+		description: "Rename a scene",
+		category: "scenes",
+		args: { sceneId: "string", name: "string" },
+	},
+	"switch-scene": {
+		description: "Make a scene the active scene",
+		category: "scenes",
+		args: { sceneId: "string" },
+	},
+	"remove-bookmark": {
+		description: "Remove a bookmark at a given time",
+		category: "timeline",
+		args: { time: "number" },
+	},
+	"update-bookmark": {
+		description: "Update a bookmark's fields (e.g. label) at a given time",
+		category: "timeline",
+		args: { time: "number", updates: "object" },
+	},
+	"move-bookmark": {
+		description: "Move a bookmark from one time to another",
+		category: "timeline",
+		args: { fromTime: "number", toTime: "number" },
 	},
 } as const satisfies Record<string, TActionBaseDefinition>;
 

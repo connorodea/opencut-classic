@@ -10,6 +10,7 @@ import type {
 } from "@/animation/types";
 import type { MediaTime } from "@/wasm";
 import type { ElementBounds } from "@/preview/element-bounds";
+import type { Bookmark } from "@/timeline";
 import type { TAction } from "./definitions";
 
 export type { TAction };
@@ -100,6 +101,13 @@ export type TActionArgsMap = {
 		canvasPoint: { x: number; y: number };
 		bounds: ElementBounds;
 	};
+	"create-scene": { name: string; isMain: boolean };
+	"delete-scene": { sceneId: string };
+	"rename-scene": { sceneId: string; name: string };
+	"switch-scene": { sceneId: string };
+	"remove-bookmark": { time: MediaTime };
+	"update-bookmark": { time: MediaTime; updates: Partial<Omit<Bookmark, "time">> };
+	"move-bookmark": { fromTime: MediaTime; toTime: MediaTime };
 };
 
 type TKeysWithValueUndefined<T> = {

@@ -749,4 +749,73 @@ export function useEditorActions() {
 		},
 		undefined,
 	);
+
+	useActionHandler(
+		"create-scene",
+		(args) => {
+			if (!args) return;
+			void editor.scenes.createScene({ name: args.name, isMain: args.isMain });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"delete-scene",
+		(args) => {
+			if (!args) return;
+			void editor.scenes.deleteScene({ sceneId: args.sceneId });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"rename-scene",
+		(args) => {
+			if (!args) return;
+			void editor.scenes.renameScene({ sceneId: args.sceneId, name: args.name });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"switch-scene",
+		(args) => {
+			if (!args) return;
+			void editor.scenes.switchToScene({ sceneId: args.sceneId });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"remove-bookmark",
+		(args) => {
+			if (!args) return;
+			void editor.scenes.removeBookmark({ time: args.time });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-bookmark",
+		(args) => {
+			if (!args) return;
+			void editor.scenes.updateBookmark({
+				time: args.time,
+				updates: args.updates,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"move-bookmark",
+		(args) => {
+			if (!args) return;
+			void editor.scenes.moveBookmark({
+				fromTime: args.fromTime,
+				toTime: args.toTime,
+			});
+		},
+		undefined,
+	);
 }
