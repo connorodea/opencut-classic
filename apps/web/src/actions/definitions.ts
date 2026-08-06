@@ -154,6 +154,12 @@ export const ACTIONS = {
 		category: "assets",
 		args: { projectId: "string", assetIds: "string[]" },
 	},
+	"add-media-asset": {
+		description:
+			"Add a media asset (already-processed: name/type/file and optional dimensions/duration/fps) to a project",
+		category: "assets",
+		args: { projectId: "string", asset: "object" },
+	},
 	"export-project": {
 		description: "Render and export the active project to a video file",
 		category: "project",

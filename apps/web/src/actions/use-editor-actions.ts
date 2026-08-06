@@ -520,6 +520,15 @@ export function useEditorActions() {
 	);
 
 	useActionHandler(
+		"add-media-asset",
+		(args) => {
+			if (!args) return;
+			handlers.addMediaAsset(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
 		"export-project",
 		(args) => {
 			if (!args) return;

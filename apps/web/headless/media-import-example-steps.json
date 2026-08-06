@@ -1,0 +1,17 @@
+[
+	{
+		"action": "add-media-asset",
+		"args": {
+			"projectId": "$currentProjectId",
+			"asset": {
+				"name": "fake-video.mp4",
+				"type": "video",
+				"file": { "$file": "/absolute/path/to/your-video.mp4" },
+				"duration": 5,
+				"width": 1920,
+				"height": 1080
+			}
+		}
+	},
+	{ "action": "save-project" }
+]

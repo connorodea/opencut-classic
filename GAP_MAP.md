@@ -5,9 +5,9 @@
 > invoked through `EditorCore`'s three managers — `TimelineManager`, `ScenesManager`,
 > `ProjectManager` — via a shared `CommandManager` with undo/redo).
 
-_Last updated: 2026-08-06 · v1.0 — Tier 1, Tier 2, Tier 3, and the one genuine
-direct-bypass gap are all closed. The remaining media-import gap is intentionally
-deferred to Goal 2a rather than closed superficially here._
+_Last updated: 2026-08-06 · v1.1 — Tier 1, Tier 2, Tier 3, and both genuine
+direct-bypass gaps (captions, media import) are closed and verified headlessly. No
+known open gaps remain in this audit's scope._
 
 ## Architecture found
 
@@ -103,13 +103,24 @@ The explicit call this doc asked for, made:
   `ClipboardEvent`/`DragEvent` data (`DataTransfer` → `File[]`) and an async
   `processMediaAssets` transcoding step before any Command runs. An agent invoking these
   through the Action API wouldn't have OS-clipboard/drag `File` objects to hand over in
-  the first place — the actual gap underneath isn't "these bypass `invokeAction`", it's
-  **"there is no Action for importing/creating a media asset at all"** (only
-  `remove-media-asset(s)` exist; nothing like `add-media-asset` does). That's a real,
-  separate, larger gap — it needs a design decision (accept a pre-processed `MediaAsset`?
-  a URL? a path?) rather than a thin wrapper, and arguably belongs with Goal 2's headless
-  invocation contract (2a) rather than squeezed into this sweep. Flagging it there rather
-  than closing it here with something superficial.
+  the first place. **Closed 2026-08-06** — the actual gap underneath these two wasn't
+  "they bypass `invokeAction`", it was **"there is no Action for importing/creating a
+  media asset at all"**, and that part is now closed: `add-media-asset` wraps
+  `MediaManager.addMediaAsset({projectId, asset: Omit<MediaAsset, "id">})` directly. The
+  design question this row originally deferred (accept a pre-processed `MediaAsset`? a
+  URL? a path?) resolved to "a pre-processed `MediaAsset`" — that's what the existing
+  manager method already took, so the Action just exposes it; no new design was needed,
+  the manager-level answer was already there. Verified headlessly (not just typechecked)
+  via `apps/web/headless/run.ts` + `media-import-example-steps.json`: a real file read
+  from disk, wrapped in a `File` (Node/Bun 20+ have a global `File`), persisted correctly
+  through both the metadata (`FileSystemAdapter`) and blob (`FileSystemBlobAdapter`)
+  storage layers — bytes on disk match the source file exactly. **What this Action does
+  NOT solve**: producing a `MediaAsset`'s probed fields (`duration`/`width`/`height`/
+  `fps`/`hasAudio`) from an arbitrary raw file automatically — that's
+  `processMediaAssets`' job in the browser flow, unverified headlessly, likely hits
+  further browser-API walls (video/audio decoding). A caller (human or agent) supplying
+  those fields itself, as the example does, sidesteps that — full automatic probing is
+  real, separate, deferred work, not silently assumed solved by this Action's existence.
 
 ## Scope note
 This audit covers the **editing/project capability surface** (managers + commands) since
@@ -119,20 +130,18 @@ pan) — per VISION.md's MVP boundary these are lower value for agent control an
 deliberately out of scope for Goal 1 unless a Goal 3 proof scenario surfaces a real need.
 
 ## Gap count
-69 registered Actions (30 original + 4 closing Tier 1 + 5 closing effects + 5 closing
+70 registered Actions (30 original + 4 closing Tier 1 + 5 closing effects + 5 closing
 keyframes/animation + 3 closing masks + 7 closing scene CRUD/bookmarks + 4 closing
 tracks + 5 closing project-library lifecycle + 5 closing Tier 3 element ops +
-`insert-captions-as-text-track` closing the one direct-bypass call site that was a
-genuine gap rather than an intentional direct-manipulation boundary). **Every
-manager-level mutating method and every UI-triggerable operation with no browser-event
-dependency identified in this audit now has Action coverage.**
+`insert-captions-as-text-track` + `add-media-asset`, the two direct-bypass-adjacent
+gaps that turned out to be genuine, both closed). **Every manager-level mutating method
+and every UI-triggerable operation with no browser-event dependency identified in this
+audit now has Action coverage — no known open gaps remain.**
 
 ## What's left before Goal 1's overall done-when is fully met
-Two things, both deliberate, both documented above rather than silently left open:
-1. **Media import has no Action** (`add-media-asset` doesn't exist) — real gap, needs a
-   design call on what an agent hands over (asset object / URL / path), best made as part
-   of Goal 2a's headless invocation contract rather than bolted on here.
-2. `use-paste-media.ts` and `drag-drop-controller.ts` will keep calling
-   Commands/managers directly even after (1) is resolved, since they're inherently
-   browser-event-driven — that's correct, not a lingering bypass, and doesn't block
-   Goal 1b's accept criteria on its own.
+One thing, deliberate, documented above rather than silently left open:
+`use-paste-media.ts` and `drag-drop-controller.ts` will keep calling Commands/managers
+directly even now that `add-media-asset` exists, since they're inherently
+browser-event-driven (raw `ClipboardEvent`/`DragEvent` data). That's correct, not a
+lingering bypass — an agent was never going to have OS-clipboard `File` objects to hand
+`invokeAction` in the first place — and doesn't block Goal 1b's accept criteria.

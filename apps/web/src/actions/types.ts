@@ -17,6 +17,7 @@ import type {
 	PlannedTrackCreation,
 } from "@/timeline/group-move";
 import type { SubtitleCue } from "@/subtitles/types";
+import type { MediaAsset } from "@/media/types";
 import type { TAction } from "./definitions";
 
 export type { TAction };
@@ -28,6 +29,7 @@ export type TActionArgsMap = {
 	"jump-backward": { seconds: number } | undefined;
 	"remove-media-asset": { projectId: string; assetId: string };
 	"remove-media-assets": { projectId: string; assetIds: string[] };
+	"add-media-asset": { projectId: string; asset: Omit<MediaAsset, "id"> };
 	"export-project": {
 		format: ExportFormat;
 		quality: ExportQuality;

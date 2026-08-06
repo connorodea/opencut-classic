@@ -370,6 +370,20 @@ export function updateElements(
 	});
 }
 
+export function addMediaAsset(
+	editor: EditorCore,
+	args: TActionArgsMap["add-media-asset"],
+): void {
+	// Fire-and-forget, like create-project: the new asset is observed via
+	// editor.media.getAssets() after this resolves (addMediaAsset returns
+	// the created MediaAsset | null, but useActionHandler's void signature
+	// can't surface that — same tradeoff as export-project/create-project).
+	void editor.media.addMediaAsset({
+		projectId: args.projectId,
+		asset: args.asset,
+	});
+}
+
 export function insertCaptionsAsTextTrack(
 	editor: EditorCore,
 	args: TActionArgsMap["insert-captions-as-text-track"],
@@ -429,4 +443,5 @@ export const ACTION_HANDLERS: Record<
 	"move-elements": moveElements,
 	"update-elements": updateElements,
 	"insert-captions-as-text-track": insertCaptionsAsTextTrack,
+	"add-media-asset": addMediaAsset,
 };

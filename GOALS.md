@@ -34,15 +34,19 @@ list above, deferred to VISION.md's Next/Later milestones.
 **Done when:** every currently UI-triggerable operation in classic has a corresponding
 registered Action with typed args and a doc entry per the existing `docs/actions.md`
 pattern; no UI handler calls `editor.xxx()` directly, bypassing `invokeAction`.
-**Status:** 1a and 1b both done 2026-08-06 (69 Actions registered, `GAP_MAP.md` v1.0).
-Goal 1's own literal done-when ("every currently UI-triggerable operation... has a
-corresponding registered Action") isn't 100% met yet: media-asset creation via
-paste/drag-drop still bypasses the Action layer, deliberately — see `GAP_MAP.md`'s
-"What's left" section. That's a real, separate gap needing a design decision (what does
-an agent hand over instead of a browser `File`?), deferred to Goal 2a's headless
-invocation contract rather than closed superficially here. Not blocking: Goal 2's
-"invoke Actions against a project" scope doesn't require importing new media to prove
-out, and Goal 3's proof scenario can pick footage that's already in a project if needed.
+**Status:** done 2026-08-06 (70 Actions registered, `GAP_MAP.md` v1.1). The
+media-import gap flagged when 1a/1b were first marked done (paste/drag-drop bypassing
+the Action layer) is now closed too: `add-media-asset` wraps
+`MediaManager.addMediaAsset` directly, and the deferred design question ("what does an
+agent hand over instead of a browser `File`?") resolved to "a pre-processed `MediaAsset`
+object" — the manager already took that shape, so no new design was actually needed.
+Verified headlessly via `apps/web/headless/run.ts` + `media-import-example-steps.json`:
+a real file's bytes persist correctly through both storage layers. Automatic probing of
+a raw file's duration/dimensions/fps (what `processMediaAssets` does in the browser
+flow) remains unverified headlessly and is real, separate, deferred work — a caller
+supplying those fields itself sidesteps it, as the kept example does. `use-paste-media.ts`
+and `drag-drop-controller.ts` correctly keep calling managers directly (browser-event-
+driven, nothing to route through `invokeAction`), which is by design, not a lingering gap.
 **Sub-goals:**
 - [x] **1a** Audit every UI-triggerable operation across `apps/web` (buttons, menus,
   shortcuts, panels) and produce a gap-map: covered-by-an-Action vs. direct-handler-bypass
