@@ -412,7 +412,14 @@ substantially bigger than a session continuation:
   via Playwright, with WebGPU flags) instead of bare Bun — a fundamentally different
   transport than v1.0's decision, back to something resembling the path v1.2 explored
   and moved away from, for a genuinely different reason this time (GPU access, not the
-  barrel/RSC issue).
+  barrel/RSC issue). **Checked, not assumed: this option isn't automatic either.** A
+  real Chromium instance (via this session's Playwright MCP tool) was navigated to
+  `about:blank` and checked directly — `navigator.gpu` is `undefined` there too. So
+  "switch to a real browser" only helps if *that browser's own environment* has GPU
+  access (real hardware passthrough, or a working software rasterizer like Dawn's
+  SwiftShader) — the fix is "browser + GPU-capable host," not "browser" alone. This
+  session's own sandboxed execution environment is itself one example of a host without
+  it, which is worth knowing before assuming a Playwright-based fix is a quick swap.
 
 **What this means for Goal 2 / Goal 3, concretely:** the headless shell can load,
 create, mutate, and save/reload a project correctly, and can dispatch every Action
