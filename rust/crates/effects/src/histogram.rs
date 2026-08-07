@@ -46,6 +46,36 @@ impl Histogram {
     }
 }
 
+/// Bins tightly-packed RGBA8 pixel bytes (row stride == width*4, no padding
+/// -- e.g. a canvas `ImageData.data` buffer) into a histogram, with no GPU
+/// dependency at all. Split out from `compute_histogram` so the binning
+/// logic is callable anywhere pixel bytes are already in hand (a WASM
+/// binding operating on canvas `ImageData`, in particular) without needing
+/// a live `GpuContext`/`wgpu::Texture` -- see `rust/wasm/src/scopes.rs`.
+pub fn compute_histogram_from_pixels(
+    pixels: &[u8],
+    width: u32,
+    height: u32,
+    is_bgra: bool,
+) -> Histogram {
+    let bytes_per_pixel = 4u32;
+    let mut histogram = Histogram::empty();
+    for y in 0..height {
+        let row_start = (y * width * bytes_per_pixel) as usize;
+        for x in 0..width {
+            let pixel_start = row_start + (x * bytes_per_pixel) as usize;
+            let pixel = &pixels[pixel_start..pixel_start + 4];
+            let (r, g, b) = if is_bgra {
+                (pixel[2], pixel[1], pixel[0])
+            } else {
+                (pixel[0], pixel[1], pixel[2])
+            };
+            histogram.record(r, g, b);
+        }
+    }
+    histogram
+}
+
 /// Reads back `texture` and computes its per-channel histogram. Handles
 /// both `Bgra8Unorm` (the native Metal/Vulkan/DX12 path) and `Rgba8Unorm`
 /// (the WebGL fallback path) texture formats correctly rather than
@@ -115,22 +145,13 @@ pub fn compute_histogram(
     let mapped = slice.get_mapped_range();
     let is_bgra = context.texture_format() == wgpu::TextureFormat::Bgra8Unorm;
 
-    let mut histogram = Histogram::empty();
+    let mut tightly_packed = Vec::with_capacity((width * height * bytes_per_pixel) as usize);
     for y in 0..height {
         let row_start = (y * padded_bytes_per_row) as usize;
-        for x in 0..width {
-            let pixel_start = row_start + (x * bytes_per_pixel) as usize;
-            let pixel = &mapped[pixel_start..pixel_start + 4];
-            let (r, g, b) = if is_bgra {
-                (pixel[2], pixel[1], pixel[0])
-            } else {
-                (pixel[0], pixel[1], pixel[2])
-            };
-            histogram.record(r, g, b);
-        }
+        tightly_packed.extend_from_slice(&mapped[row_start..row_start + (width * bytes_per_pixel) as usize]);
     }
     drop(mapped);
     readback_buffer.unmap();
 
-    histogram
+    compute_histogram_from_pixels(&tightly_packed, width, height, is_bgra)
 }

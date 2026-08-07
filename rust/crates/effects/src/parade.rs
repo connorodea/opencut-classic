@@ -20,6 +20,43 @@ pub struct Parade {
     pub blue_by_column: Vec<[u32; 256]>,
 }
 
+/// Bins tightly-packed RGBA8 pixel bytes (row stride == width*4, no
+/// padding) into a parade, with no GPU dependency -- see
+/// `compute_histogram_from_pixels` for why this split exists.
+pub fn compute_parade_from_pixels(
+    pixels: &[u8],
+    width: u32,
+    height: u32,
+    is_bgra: bool,
+) -> Parade {
+    let bytes_per_pixel = 4u32;
+    let mut red_by_column = vec![[0u32; 256]; width as usize];
+    let mut green_by_column = vec![[0u32; 256]; width as usize];
+    let mut blue_by_column = vec![[0u32; 256]; width as usize];
+    for y in 0..height {
+        let row_start = (y * width * bytes_per_pixel) as usize;
+        for x in 0..width {
+            let pixel_start = row_start + (x * bytes_per_pixel) as usize;
+            let pixel = &pixels[pixel_start..pixel_start + 4];
+            let (r, g, b) = if is_bgra {
+                (pixel[2], pixel[1], pixel[0])
+            } else {
+                (pixel[0], pixel[1], pixel[2])
+            };
+            let column = x as usize;
+            red_by_column[column][r as usize] += 1;
+            green_by_column[column][g as usize] += 1;
+            blue_by_column[column][b as usize] += 1;
+        }
+    }
+    Parade {
+        width: width as usize,
+        red_by_column,
+        green_by_column,
+        blue_by_column,
+    }
+}
+
 /// Reads back `texture` and computes its parade (per-column, per-channel
 /// value distributions). See `compute_histogram` for the readback/format-
 /// handling pattern this mirrors.
@@ -86,32 +123,13 @@ pub fn compute_parade(
     let mapped = slice.get_mapped_range();
     let is_bgra = context.texture_format() == wgpu::TextureFormat::Bgra8Unorm;
 
-    let mut red_by_column = vec![[0u32; 256]; width as usize];
-    let mut green_by_column = vec![[0u32; 256]; width as usize];
-    let mut blue_by_column = vec![[0u32; 256]; width as usize];
+    let mut tightly_packed = Vec::with_capacity((width * height * bytes_per_pixel) as usize);
     for y in 0..height {
         let row_start = (y * padded_bytes_per_row) as usize;
-        for x in 0..width {
-            let pixel_start = row_start + (x * bytes_per_pixel) as usize;
-            let pixel = &mapped[pixel_start..pixel_start + 4];
-            let (r, g, b) = if is_bgra {
-                (pixel[2], pixel[1], pixel[0])
-            } else {
-                (pixel[0], pixel[1], pixel[2])
-            };
-            let column = x as usize;
-            red_by_column[column][r as usize] += 1;
-            green_by_column[column][g as usize] += 1;
-            blue_by_column[column][b as usize] += 1;
-        }
+        tightly_packed.extend_from_slice(&mapped[row_start..row_start + (width * bytes_per_pixel) as usize]);
     }
     drop(mapped);
     readback_buffer.unmap();
 
-    Parade {
-        width: width as usize,
-        red_by_column,
-        green_by_column,
-        blue_by_column,
-    }
+    compute_parade_from_pixels(&tightly_packed, width, height, is_bgra)
 }
