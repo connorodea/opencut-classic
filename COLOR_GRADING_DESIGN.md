@@ -225,9 +225,16 @@ Ranked by how much new Rust work each needs, cheapest first:
    would miss). Handles both `Bgra8Unorm` (native) and `Rgba8Unorm` (WebGL fallback)
    texture formats via `context.texture_format()` rather than hardcoding channel order
    the way the ad hoc readback in every other test file does — getting this wrong on the
-   GL fallback would silently swap R and B in every bucket. Waveform, vectorscope, and
-   parade remain; Action/UI wiring (making histogram data queryable/displayable, not just
-   computable in Rust) is a separate, not-yet-started follow-up.
+   GL fallback would silently swap R and B in every bucket. **Waveform's core computation
+   also closed 2026-08-06** (`effects::compute_waveform`) — per-column luma histograms
+   (one bucket-column per source pixel column, full horizontal resolution, no
+   downsampling), reusing histogram.rs's luma weighting and format handling. Verified two
+   ways: a 3-column test confirms columns don't leak into each other and that two
+   distinct luma values in one column stay as two separate buckets rather than being
+   merged, and a 4-pixel gradient test confirms each column gets its own distinct
+   expected bucket. Vectorscope and parade remain; Action/UI wiring for both histogram
+   and waveform (making the data queryable/displayable, not just computable in Rust) is a
+   separate, not-yet-started follow-up.
 
 ## What 4b should NOT assume
 

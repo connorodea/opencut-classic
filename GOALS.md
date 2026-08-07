@@ -226,8 +226,8 @@ blocker, not assumed solved.
 
 **Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels, log wheels,
 HSL qualifier, luma curve, LUT import/apply, and the serial node graph closed; scopes
-started (histogram's core computation done, waveform/vectorscope/parade + all Action/UI
-wiring for scopes still open).
+in progress (histogram + waveform core computation done, vectorscope/parade + all
+Action/UI wiring for scopes still open).
 **Explicit sequencing override, recorded rather
 than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
 both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
@@ -328,9 +328,13 @@ release once one override happens.
   and scopes are read-only analysis (texture readback + CPU binning), not a rendering
   pass, so nothing about them was ever actually blocked. `effects::compute_histogram`
   verified against a hand-counted expected histogram for a known image, including
-  asserting every non-matching bucket is exactly zero. Waveform/vectorscope/parade and
-  all Action/UI wiring (making scope data queryable, not just computable in Rust) remain
-  open — this is one scope type's core computation, not the whole item.
+  asserting every non-matching bucket is exactly zero. **Waveform's core computation
+  also done 2026-08-06** (`effects::compute_waveform`) — per-column luma histograms,
+  full horizontal resolution; verified columns stay independent (no cross-column
+  leakage) and that two distinct luma values in one column stay as two separate buckets
+  rather than being merged. Vectorscope/parade and all Action/UI wiring (making scope
+  data queryable, not just computable in Rust) remain open — these are two scope types'
+  core computations, not the whole item.
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via
