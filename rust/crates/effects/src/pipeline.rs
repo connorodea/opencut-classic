@@ -23,6 +23,8 @@ const EXPOSURE_SHADER_ID: &str = "exposure";
 const EXPOSURE_SHADER_SOURCE: &str = include_str!("shaders/exposure.wgsl");
 const WHITE_BALANCE_SHADER_ID: &str = "white-balance";
 const WHITE_BALANCE_SHADER_SOURCE: &str = include_str!("shaders/white_balance.wgsl");
+const RGB_CURVES_SHADER_ID: &str = "rgb-curves";
+const RGB_CURVES_SHADER_SOURCE: &str = include_str!("shaders/rgb_curves.wgsl");
 
 /// Grid resolution per axis of the tiled-2D 3D LUT texture (9x9x9 = 729
 /// points). Must match the `LUT_SIZE` constant declared in lut_3d.wgsl --
@@ -78,13 +80,14 @@ pub enum EffectsError {
     },
 }
 
-// scalars_b extends the original 4-float scalars slot for shaders that need
-// more than 4 free values (e.g. hsl-qualifier's 7 params). Appended at the
-// end so it's backward-compatible: WGSL uniform-buffer bindings only read
-// the bytes their own struct declares, so shaders that don't know about
-// scalars_b (gaussian-blur, primary-wheels, log-wheels) are unaffected --
-// verified by re-running their existing tests after this change, not
-// assumed safe from the WGSL spec alone.
+// scalars_b/scalars_c/scalars_d extend the original 4-float scalars slot
+// for shaders that need more than 4 free values (hsl-qualifier's 7 params
+// needed scalars_b; rgb-curves' 15 independent-per-channel control points
+// needed scalars_c/scalars_d too). Appended at the end so each extension is
+// backward-compatible: WGSL uniform-buffer bindings only read the bytes
+// their own struct declares, so shaders that don't know about the newer
+// slots are unaffected -- verified by re-running every existing shader's
+// tests after each extension, not assumed safe from the WGSL spec alone.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct EffectUniformBuffer {
@@ -92,6 +95,8 @@ struct EffectUniformBuffer {
     direction: [f32; 2],
     scalars: [f32; 4],
     scalars_b: [f32; 4],
+    scalars_c: [f32; 4],
+    scalars_d: [f32; 4],
 }
 
 impl EffectPipeline {
@@ -174,6 +179,13 @@ impl EffectPipeline {
                 .create_shader_module(wgpu::ShaderModuleDescriptor {
                     label: Some("effects-luma-curve-shader"),
                     source: wgpu::ShaderSource::Wgsl(LUMA_CURVE_SHADER_SOURCE.into()),
+                });
+        let rgb_curves_shader_module =
+            context
+                .device()
+                .create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("effects-rgb-curves-shader"),
+                    source: wgpu::ShaderSource::Wgsl(RGB_CURVES_SHADER_SOURCE.into()),
                 });
         let lut_3d_shader_module =
             context
@@ -404,6 +416,42 @@ impl EffectPipeline {
                     multiview_mask: None,
                     cache: None,
                 });
+        let rgb_curves_pipeline =
+            context
+                .device()
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("effects-rgb-curves-pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vertex_shader_module,
+                        entry_point: Some("vertex_main"),
+                        buffers: &[wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<[f32; 2]>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &[wgpu::VertexAttribute {
+                                format: wgpu::VertexFormat::Float32x2,
+                                offset: 0,
+                                shader_location: 0,
+                            }],
+                        }],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &rgb_curves_shader_module,
+                        entry_point: Some("fragment_main"),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: context.texture_format(),
+                            blend: None,
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
         let exposure_pipeline =
             context
                 .device()
@@ -527,6 +575,7 @@ impl EffectPipeline {
             (LUT_3D_SHADER_ID.to_string(), lut_3d_pipeline),
             (EXPOSURE_SHADER_ID.to_string(), exposure_pipeline),
             (WHITE_BALANCE_SHADER_ID.to_string(), white_balance_pipeline),
+            (RGB_CURVES_SHADER_ID.to_string(), rgb_curves_pipeline),
         ]);
 
         Self {
@@ -695,6 +744,7 @@ fn pack_effect_uniforms(
         LUT_3D_SHADER_ID => pack_lut_uniforms(pass, width, height),
         EXPOSURE_SHADER_ID => pack_exposure_uniforms(pass, width, height),
         WHITE_BALANCE_SHADER_ID => pack_white_balance_uniforms(pass, width, height),
+        RGB_CURVES_SHADER_ID => pack_rgb_curves_uniforms(pass, width, height),
         _ => Err(EffectsError::UnknownEffectShader {
             shader: shader.to_string(),
         }),
@@ -732,6 +782,8 @@ fn pack_gaussian_blur_uniforms(
         direction,
         scalars: [sigma, step, 0.0, 0.0],
         scalars_b: [0.0; 4],
+        scalars_c: [0.0; 4],
+        scalars_d: [0.0; 4],
     })
 }
 
@@ -751,6 +803,8 @@ fn pack_primary_wheels_uniforms(
         direction: [0.0, 0.0],
         scalars: [lift, gamma, gain, offset],
         scalars_b: [0.0; 4],
+        scalars_c: [0.0; 4],
+        scalars_d: [0.0; 4],
     })
 }
 
@@ -770,6 +824,8 @@ fn pack_log_wheels_uniforms(
         direction: [0.0, 0.0],
         scalars: [lift, gamma_offset, gain, offset],
         scalars_b: [0.0; 4],
+        scalars_c: [0.0; 4],
+        scalars_d: [0.0; 4],
     })
 }
 
@@ -803,6 +859,8 @@ fn pack_hsl_qualifier_uniforms(
         direction: [0.0, 0.0],
         scalars: [hue_center, hue_width, sat_center, sat_width],
         scalars_b: [lum_center, lum_width, softness, 0.0],
+        scalars_c: [0.0; 4],
+        scalars_d: [0.0; 4],
     })
 }
 
@@ -823,6 +881,8 @@ fn pack_luma_curve_uniforms(
         direction: [0.0, 0.0],
         scalars: [y0, y1, y2, y3],
         scalars_b: [y4, 0.0, 0.0, 0.0],
+        scalars_c: [0.0; 4],
+        scalars_d: [0.0; 4],
     })
 }
 
@@ -842,6 +902,8 @@ fn pack_lut_uniforms(
         direction: [0.0, 0.0],
         scalars: [intensity, 0.0, 0.0, 0.0],
         scalars_b: [0.0; 4],
+        scalars_c: [0.0; 4],
+        scalars_d: [0.0; 4],
     })
 }
 
@@ -951,6 +1013,8 @@ fn pack_exposure_uniforms(
         direction: [0.0, 0.0],
         scalars: [ev, 0.0, 0.0, 0.0],
         scalars_b: [0.0; 4],
+        scalars_c: [0.0; 4],
+        scalars_d: [0.0; 4],
     })
 }
 
@@ -968,6 +1032,46 @@ fn pack_white_balance_uniforms(
         direction: [0.0, 0.0],
         scalars: [temperature, tint, 0.0, 0.0],
         scalars_b: [0.0; 4],
+        scalars_c: [0.0; 4],
+        scalars_d: [0.0; 4],
+    })
+}
+
+fn pack_rgb_curves_uniforms(
+    pass: &EffectPass,
+    width: u32,
+    height: u32,
+) -> Result<EffectUniformBuffer, EffectsError> {
+    let r_y0 = read_number_uniform(pass, "u_r_y0")?;
+    let r_y1 = read_number_uniform(pass, "u_r_y1")?;
+    let r_y2 = read_number_uniform(pass, "u_r_y2")?;
+    let r_y3 = read_number_uniform(pass, "u_r_y3")?;
+    let r_y4 = read_number_uniform(pass, "u_r_y4")?;
+    let g_y0 = read_number_uniform(pass, "u_g_y0")?;
+    let g_y1 = read_number_uniform(pass, "u_g_y1")?;
+    let g_y2 = read_number_uniform(pass, "u_g_y2")?;
+    let g_y3 = read_number_uniform(pass, "u_g_y3")?;
+    let g_y4 = read_number_uniform(pass, "u_g_y4")?;
+    let b_y0 = read_number_uniform(pass, "u_b_y0")?;
+    let b_y1 = read_number_uniform(pass, "u_b_y1")?;
+    let b_y2 = read_number_uniform(pass, "u_b_y2")?;
+    let b_y3 = read_number_uniform(pass, "u_b_y3")?;
+    let b_y4 = read_number_uniform(pass, "u_b_y4")?;
+    reject_unexpected_uniforms(
+        pass,
+        &[
+            "u_r_y0", "u_r_y1", "u_r_y2", "u_r_y3", "u_r_y4", "u_g_y0", "u_g_y1", "u_g_y2",
+            "u_g_y3", "u_g_y4", "u_b_y0", "u_b_y1", "u_b_y2", "u_b_y3", "u_b_y4",
+        ],
+    )?;
+
+    Ok(EffectUniformBuffer {
+        resolution: [width as f32, height as f32],
+        direction: [0.0, 0.0],
+        scalars: [r_y0, r_y1, r_y2, r_y3],
+        scalars_b: [r_y4, g_y0, g_y1, g_y2],
+        scalars_c: [g_y3, g_y4, b_y0, b_y1],
+        scalars_d: [b_y2, b_y3, b_y4, 0.0],
     })
 }
 
