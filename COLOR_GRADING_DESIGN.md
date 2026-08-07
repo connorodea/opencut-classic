@@ -191,8 +191,23 @@ Ranked by how much new Rust work each needs, cheapest first:
    array in a `text` param (`ParamValues` has no array/blob type) — a real, working v1,
    not the eventual LUT-library/file-reference architecture DaVinci parity would want
    long-term; noted explicitly in `lut.ts`'s doc comment so it isn't mistaken for final.
-6. **Serial node graph** — free (already the effects list's behavior); document it as
-   such rather than building anything new.
+6. **Serial node graph — closed 2026-08-06.** Was free at the Action/state layer (the
+   effects list's existing order, mutable via `reorder-clip-effects` from Goal 1) — but
+   that claim had never actually been pixel-verified, only inferred from reading
+   `apply_with_encoder`'s structure (each pass's output becomes the next pass's input).
+   Reading code isn't verifying it: a copy-paste bug swapping input/output textures, or
+   a texture-aliasing bug, would look identical on inspection and only show up by
+   running it. Added `rust/crates/effects/tests/serial_chain.rs`: chains two
+   non-commutative primary-wheels passes (multiplicative gain, additive offset) in both
+   orders and confirms each ordering matches its own independently hand-computed
+   expected value, *and* that the two orderings genuinely differ from each other — proof
+   that pass 2 really consumes pass 1's output rather than the original source, and that
+   order is respected end to end, not just "multiple passes can run." A second test
+   chains three additive passes and confirms all three compose, not just the last one.
+   The TS/Action side (`resolveEffectPassGroups` in `resolve.ts`: `effects.filter(...).
+   map(...)`) wasn't given its own test — array `.map()` is provably order-preserving by
+   inspection, unlike GPU pass chaining, which is exactly the kind of claim this session
+   learned (via the luma-curve bug) not to trust without running it.
 7. **Parallel node graph** — real new data-model work, recommend deferring past 4b's
    first pass.
 8. **Scopes** — UI/Action wiring can proceed now; pixel-correctness verification is

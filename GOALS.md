@@ -225,8 +225,8 @@ pixel-level correctness explicitly gated on the still-unresolved WebGPU renderin
 blocker, not assumed solved.
 
 **Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels, log wheels,
-HSL qualifier, luma curve, and LUT import/apply closed (serial node graph + scopes left
-in the gap-map's ranked order).
+HSL qualifier, luma curve, LUT import/apply, and the serial node graph closed (scopes
+left in the gap-map's ranked order).
 **Explicit sequencing override, recorded rather
 than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
 both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
@@ -312,9 +312,14 @@ release once one override happens.
   type exists) — documented as a real v1, not the eventual LUT-library architecture.
   Same two-way verification as everything else (5 native-GPU pixel tests incl. an
   independently-predicted channel-swap case + headless state-persistence proof, all
-  pass). Serial node graph next, per the gap-map's ranked order — expected to already
-  be free (the effects list's existing ordering), needing verification/documentation
-  rather than new building.
+  pass). **Serial node graph done 2026-08-06** — was assumed free (the effects list's
+  existing order) from reading `apply_with_encoder`'s structure, but that inference had
+  never actually been run. Added a real pixel test chaining two non-commutative passes
+  (multiplicative gain, additive offset) in both orders: each ordering matches its own
+  independently hand-computed expected value, and the two orderings genuinely differ,
+  proving pass 2 truly consumes pass 1's output and order is respected end to end — the
+  same "don't trust an inference you haven't run" discipline the luma-curve bug taught.
+  Only scopes left in the gap-map's ranked order.
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via
