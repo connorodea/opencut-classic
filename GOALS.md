@@ -216,17 +216,21 @@ signal the problem is feature depth, not API completeness — revisit scope, don
 on autopilot.
 
 ### Goal 4 — Color grading foundation is a documented, agent-drivable Action surface · serves: core value prop ("DaVinci-grade grading" from the north star, "UI is just one client of the control surface" pillar)
-**Done when:** primary wheels, log wheels, RGB/luma curves, HSL/RGB/luma qualifiers, a
-basic serial+parallel node graph, and LUT (1D/3D `.cube`) import/apply can all be built
-on a clip entirely through registered Actions, with grading state correctly persisted
-and headlessly verifiable — the same rigor `GAP_MAP.md` established for Goal 1. Scopes
-(waveform/vectorscope/histogram/parade) exist as verification tooling, with their own
-pixel-level correctness explicitly gated on the still-unresolved WebGPU rendering
-blocker, not assumed solved.
+**Done when:** primary wheels, log wheels, RGB/luma curves, HSL/RGB/luma qualifiers,
+basic exposure/white-balance controls, a basic serial+parallel node graph, and LUT
+(1D/3D `.cube`) import/apply can all be built on a clip entirely through registered
+Actions, with grading state correctly persisted and headlessly verifiable — the same
+rigor `GAP_MAP.md` established for Goal 1. Scopes (waveform/vectorscope/histogram/
+parade) exist as verification tooling, with their own pixel-level correctness
+explicitly gated on the still-unresolved WebGPU rendering blocker, not assumed solved.
+_(Exposure/white-balance added to this clause 2026-08-06 — the original Phase 1 scope
+always included "basic RAW exposure/WB/temp-tint controls," but 4a's gap-map and this
+clause both missed it; see `COLOR_GRADING_DESIGN.md` gap-map item 9 for the correction.)_
 
 **Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels, log wheels,
-HSL qualifier, luma curve, LUT import/apply, the serial node graph, and all four scopes'
-core computations (histogram/waveform/vectorscope/parade) closed. Scopes' Action/UI
+HSL qualifier, luma curve, LUT import/apply, the serial node graph, exposure +
+white-balance, and all four scopes' core computations (histogram/waveform/vectorscope/
+parade) closed. Scopes' Action/UI
 wiring in progress: WASM bindings (`rust/wasm/src/scopes.rs`, committed) and a TS
 service layer (`@/services/color-scope/service.ts`, written + verified via local link,
 not yet committed) are done, both real-verified through the actual JS/WASM bridge —
@@ -361,6 +365,21 @@ release once one override happens.
   own spike). **All four scope types' core computations are closed.** Only Action/UI
   wiring remains — these are read-only Rust computations with no registered Action
   reaching them yet, a distinct, real gap from the computation itself being correct.
+  **Exposure + white balance done 2026-08-06 — a gap-map correction, not a
+  scheduled item.** Found while blocked waiting on the scopes npm-publish step (below)
+  by re-reading this doc rather than idling: the original Phase 1 scope always included
+  "basic RAW exposure/WB/temp-tint controls," but 4a's gap-map and this clause's own
+  "Done when" never listed it — a genuine miss, the same class of mistake this doc warns
+  against repeating (Goal 1's v0.1 gap-map missed 3 methods). Scoped down like every
+  other primitive: not DaVinci's actual RAW page (true camera-sensor decode, which this
+  codebase has no support for anywhere), but two ordinary `EffectDefinition`s —
+  `exposure` (EV-stops scalar, `output = input * 2^ev`) and `white-balance`
+  (temperature/tint as a relative correction, not absolute Kelvin/blackbody math, same
+  as DaVinci's own WB slider). Verified on native GPU against independently
+  hand-computed references: EV=0 and temp/tint=0 are both true no-ops, +1/-1 EV exactly
+  double/halve, positive temperature measurably warms and positive tint measurably
+  shifts toward magenta, matching the shaders' own documented coefficients — plus the
+  usual headless state-persistence proofs for both.
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via
