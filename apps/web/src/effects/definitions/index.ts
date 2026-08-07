@@ -3,12 +3,14 @@ import { blurEffectDefinition } from "./blur";
 import { primaryWheelsEffectDefinition } from "./primary-wheels";
 import { logWheelsEffectDefinition } from "./log-wheels";
 import { hslQualifierEffectDefinition } from "./hsl-qualifier";
+import { lumaCurveEffectDefinition } from "./luma-curve";
 
 const defaultEffects = [
 	blurEffectDefinition,
 	primaryWheelsEffectDefinition,
 	logWheelsEffectDefinition,
 	hslQualifierEffectDefinition,
+	lumaCurveEffectDefinition,
 ];
 
 export function registerDefaultEffects(): void {
