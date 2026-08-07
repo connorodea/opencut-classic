@@ -224,8 +224,8 @@ and headlessly verifiable — the same rigor `GAP_MAP.md` established for Goal 1
 pixel-level correctness explicitly gated on the still-unresolved WebGPU rendering
 blocker, not assumed solved.
 
-**Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels closed (5 more
-subsystems in the gap-map's ranked order). **Explicit sequencing override, recorded rather
+**Status:** in-progress — 4a done 2026-08-06; 4b started, primary + log wheels closed
+(4 more subsystems in the gap-map's ranked order). **Explicit sequencing override, recorded rather
 than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
 both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
 gated behind Goal 3 passing, and Goal 3 has not passed — it's still blocked on a
@@ -281,8 +281,11 @@ release once one override happens.
   Bun/browser) is available for shader-backed subsystems (wheels, curves, qualifiers,
   LUTs); apply it wherever a subsystem has real pixel math to check, not just state.
   **Primary wheels done 2026-08-06** — see `COLOR_GRADING_DESIGN.md`'s gap-map;
-  verified both ways (native-GPU pixel test + headless state-persistence proof). Log
-  wheels next, per the gap-map's ranked order.
+  verified both ways (native-GPU pixel test + headless state-persistence proof).
+  **Log wheels done 2026-08-06** — same two-way verification; deliberately different
+  (additive, not power-curve) formula for log-encoded footage, documented as such
+  rather than assumed identical to primary wheels. HSL/RGB/luma qualifiers next, per
+  the gap-map's ranked order.
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via

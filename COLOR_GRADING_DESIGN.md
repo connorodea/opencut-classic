@@ -123,7 +123,16 @@ Ranked by how much new Rust work each needs, cheapest first:
    Scope note: master/luminance only — per-channel RGB color-balance wheels (the x/y
    position on DaVinci's actual wheel widget) deliberately deferred, stated in the
    shader's own doc comment.
-2. **Log wheels** — a second shader, same uniform infra now generalized.
+2. **Log wheels — closed 2026-08-06.** Additive lift/gamma-offset/gain/offset shipped
+   (`rust/crates/effects/src/shaders/log_wheels.wgsl`), deliberately different from
+   primary-wheels' power-curve gamma — documented as a reasonable, industry-standard-
+   adjacent model for log-encoded footage, not a verified match to DaVinci's proprietary
+   log-mode math. Distinct uniform names (`u_gamma_offset`, not `u_gamma`) so the two
+   shaders' params can't be silently cross-used — verified by a test asserting exactly
+   that. Same two-way verification as primary wheels (native-GPU pixel test +
+   headless state-persistence proof, both pass). Extracted a shared
+   `grading-proof-helpers.ts` after this became the second copy of the same proof
+   pattern — worth it now that more subsystems will repeat it.
 3. **HSL/RGB/luma qualifiers** — check `rust/crates/masks` first; may already have
    relevant keying primitives to extend rather than starting from zero.
 4. **RGB/luma curves** — needs the LUT-texture-sampling shader pattern, a genuinely new
