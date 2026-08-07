@@ -210,8 +210,24 @@ Ranked by how much new Rust work each needs, cheapest first:
    learned (via the luma-curve bug) not to trust without running it.
 7. **Parallel node graph** — real new data-model work, recommend deferring past 4b's
    first pass.
-8. **Scopes** — UI/Action wiring can proceed now; pixel-correctness verification is
-   blocked on `HEADLESS_DESIGN.md`'s rendering gap (v1.5/v1.6) until resolved.
+8. **Scopes — histogram's core computation closed 2026-08-06; waveform/vectorscope/
+   parade and all Action/UI wiring still open. Correction:** this item originally
+   assumed pixel-correctness verification was blocked on `HEADLESS_DESIGN.md`'s
+   browser/Bun rendering gap. That's wrong the same way item 4's original LUT-reuse
+   assumption was wrong — v1.6 already established native `cargo test` has real, working
+   GPU access independent of that gap, and scopes are read-only frame *analysis* (texture
+   readback + binning), not a rendering-pipeline shader pass, so they need nothing from
+   the blocked path at all. Added `effects::compute_histogram` (a plain readback + CPU
+   binning function, not an `EffectPipeline` shader — there's nothing here a fragment
+   shader does better) and verified it against a hand-counted expected histogram for a
+   known image: exact per-bucket R/G/B/luma counts, plus asserting every *other* bucket
+   is exactly zero (catches off-by-one indexing a "the right buckets are non-zero" check
+   would miss). Handles both `Bgra8Unorm` (native) and `Rgba8Unorm` (WebGL fallback)
+   texture formats via `context.texture_format()` rather than hardcoding channel order
+   the way the ad hoc readback in every other test file does — getting this wrong on the
+   GL fallback would silently swap R and B in every bucket. Waveform, vectorscope, and
+   parade remain; Action/UI wiring (making histogram data queryable/displayable, not just
+   computable in Rust) is a separate, not-yet-started follow-up.
 
 ## What 4b should NOT assume
 

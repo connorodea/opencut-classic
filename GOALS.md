@@ -225,8 +225,9 @@ pixel-level correctness explicitly gated on the still-unresolved WebGPU renderin
 blocker, not assumed solved.
 
 **Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels, log wheels,
-HSL qualifier, luma curve, LUT import/apply, and the serial node graph closed (scopes
-left in the gap-map's ranked order).
+HSL qualifier, luma curve, LUT import/apply, and the serial node graph closed; scopes
+started (histogram's core computation done, waveform/vectorscope/parade + all Action/UI
+wiring for scopes still open).
 **Explicit sequencing override, recorded rather
 than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
 both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
@@ -319,7 +320,17 @@ release once one override happens.
   independently hand-computed expected value, and the two orderings genuinely differ,
   proving pass 2 truly consumes pass 1's output and order is respected end to end — the
   same "don't trust an inference you haven't run" discipline the luma-curve bug taught.
-  Only scopes left in the gap-map's ranked order.
+  Scopes next and last in the gap-map's ranked order. **Histogram's core computation
+  done 2026-08-06** — first of the four scope types (waveform/vectorscope/histogram/
+  parade). **Correction:** this doc previously said scope pixel-correctness was blocked
+  on the browser/Bun WebGPU rendering gap; that repeated item 4's original mistake —
+  v1.6 already showed native `cargo test` has real GPU access regardless of that gap,
+  and scopes are read-only analysis (texture readback + CPU binning), not a rendering
+  pass, so nothing about them was ever actually blocked. `effects::compute_histogram`
+  verified against a hand-counted expected histogram for a known image, including
+  asserting every non-matching bucket is exactly zero. Waveform/vectorscope/parade and
+  all Action/UI wiring (making scope data queryable, not just computable in Rust) remain
+  open — this is one scope type's core computation, not the whole item.
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via
