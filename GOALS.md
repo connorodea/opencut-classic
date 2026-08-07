@@ -406,7 +406,13 @@ release once one override happens.
   (3 focused params) rendering against `hsl-qualifier`'s existing shader with the hue/sat
   gates hardcoded open — zero new Rust/GPU code. Systematically re-checked
   `DAVINCI_PARITY.md`'s full Phase 1 "In scope" line against everything shipped after
-  this; no further gaps found.
+  this; no further gaps found. **Full regression sweep run 2026-08-06** while still
+  blocked on the scopes npm publish: all 10 committed grading headless proofs
+  (bootstrap/primary-wheels/log-wheels/hsl-qualifier/luma-curve/luma-qualifier/lut/
+  exposure/white-balance/rgb-curves) re-run fresh and pass, and the full Rust workspace
+  (55 tests across every grading shader + scope computation) re-run clean — real
+  end-to-end confirmation nothing drifted across this session's cumulative Goal 4b work,
+  not just "each item passed when it was closed."
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via
