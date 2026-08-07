@@ -241,8 +241,13 @@ publish). User decided (2026-08-06): publish this fork's own scoped package
 (`@connorodea/opencut-wasm`). `rust/wasm/Cargo.toml` bumped to 0.3.0 and repointed at
 this fork's repo, `rust/wasm/pkg` built and ready — **publish itself blocked on npm
 auth** (`npm whoami` returns 401 in this environment; asked the user to run `npm login`
-via the `!` prompt prefix). The moment auth completes: `npm publish --access public`
-from `rust/wasm/pkg`, repin `apps/web/package.json`, update ~31 import sites from
+via the `!` prompt prefix). Publish prep finished 2026-08-06 while still blocked: root
+MIT `LICENSE` copied into `rust/wasm/` (wasm-pack was warning none existed), the
+upstream-branded `rust/wasm/README.md` corrected to this fork's package name/repo (same
+misleading-metadata class already fixed in `Cargo.toml`), and `--scope connorodea` baked
+into `build:wasm`/`dev:wasm` in `package.json` so the pre-existing `publish:wasm` script
+now produces the correctly-scoped package by default. The moment auth completes:
+`bun run publish:wasm`, repin `apps/web/package.json`, update ~29 import sites from
 `"opencut-wasm"` to `"@connorodea/opencut-wasm"`, `bun install`, re-verify tsc/tests,
 commit the already-written service.ts + 2 headless proof scripts. Not blocking: a visual
 scope-panel UI component (displaying the data graphically) is a separate, larger,
