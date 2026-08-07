@@ -9,6 +9,8 @@ use crate::{EffectPass, UniformValue};
 
 const GAUSSIAN_BLUR_SHADER_ID: &str = "gaussian-blur";
 const GAUSSIAN_BLUR_SHADER_SOURCE: &str = include_str!("shaders/gaussian_blur.wgsl");
+const PRIMARY_WHEELS_SHADER_ID: &str = "primary-wheels";
+const PRIMARY_WHEELS_SHADER_SOURCE: &str = include_str!("shaders/primary_wheels.wgsl");
 
 pub struct ApplyEffectsOptions<'a> {
     pub source: &'a wgpu::Texture,
@@ -84,6 +86,13 @@ impl EffectPipeline {
                     label: Some("effects-gaussian-blur-shader"),
                     source: wgpu::ShaderSource::Wgsl(GAUSSIAN_BLUR_SHADER_SOURCE.into()),
                 });
+        let primary_wheels_shader_module =
+            context
+                .device()
+                .create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("effects-primary-wheels-shader"),
+                    source: wgpu::ShaderSource::Wgsl(PRIMARY_WHEELS_SHADER_SOURCE.into()),
+                });
         let pipeline_layout =
             context
                 .device()
@@ -131,8 +140,49 @@ impl EffectPipeline {
                     multiview_mask: None,
                     cache: None,
                 });
-        let pipelines =
-            HashMap::from([(GAUSSIAN_BLUR_SHADER_ID.to_string(), gaussian_blur_pipeline)]);
+        let primary_wheels_pipeline =
+            context
+                .device()
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("effects-primary-wheels-pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vertex_shader_module,
+                        entry_point: Some("vertex_main"),
+                        buffers: &[wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<[f32; 2]>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &[wgpu::VertexAttribute {
+                                format: wgpu::VertexFormat::Float32x2,
+                                offset: 0,
+                                shader_location: 0,
+                            }],
+                        }],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &primary_wheels_shader_module,
+                        entry_point: Some("fragment_main"),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: context.texture_format(),
+                            blend: None,
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
+        let pipelines = HashMap::from([
+            (GAUSSIAN_BLUR_SHADER_ID.to_string(), gaussian_blur_pipeline),
+            (
+                PRIMARY_WHEELS_SHADER_ID.to_string(),
+                primary_wheels_pipeline,
+            ),
+        ]);
 
         Self {
             uniform_bind_group_layout,
@@ -268,24 +318,63 @@ fn pack_effect_uniforms(
     height: u32,
 ) -> Result<EffectUniformBuffer, EffectsError> {
     let shader = pass.shader.as_str();
-    let sigma = read_number_uniform(pass, "u_sigma")?;
-    let step = read_number_uniform(pass, "u_step")?;
-    let direction = read_vec2_uniform(pass, "u_direction")?;
+    match shader {
+        GAUSSIAN_BLUR_SHADER_ID => pack_gaussian_blur_uniforms(pass, width, height),
+        PRIMARY_WHEELS_SHADER_ID => pack_primary_wheels_uniforms(pass, width, height),
+        _ => Err(EffectsError::UnknownEffectShader {
+            shader: shader.to_string(),
+        }),
+    }
+}
 
+fn reject_unexpected_uniforms(
+    pass: &EffectPass,
+    expected: &[&str],
+) -> Result<(), EffectsError> {
     for uniform in pass.uniforms.keys() {
-        if uniform == "u_sigma" || uniform == "u_step" || uniform == "u_direction" {
+        if expected.contains(&uniform.as_str()) {
             continue;
         }
         return Err(EffectsError::UnsupportedUniform {
-            shader: shader.to_string(),
+            shader: pass.shader.clone(),
             uniform: uniform.clone(),
         });
     }
+    Ok(())
+}
+
+fn pack_gaussian_blur_uniforms(
+    pass: &EffectPass,
+    width: u32,
+    height: u32,
+) -> Result<EffectUniformBuffer, EffectsError> {
+    let sigma = read_number_uniform(pass, "u_sigma")?;
+    let step = read_number_uniform(pass, "u_step")?;
+    let direction = read_vec2_uniform(pass, "u_direction")?;
+    reject_unexpected_uniforms(pass, &["u_sigma", "u_step", "u_direction"])?;
 
     Ok(EffectUniformBuffer {
         resolution: [width as f32, height as f32],
         direction,
         scalars: [sigma, step, 0.0, 0.0],
+    })
+}
+
+fn pack_primary_wheels_uniforms(
+    pass: &EffectPass,
+    width: u32,
+    height: u32,
+) -> Result<EffectUniformBuffer, EffectsError> {
+    let lift = read_number_uniform(pass, "u_lift")?;
+    let gamma = read_number_uniform(pass, "u_gamma")?;
+    let gain = read_number_uniform(pass, "u_gain")?;
+    let offset = read_number_uniform(pass, "u_offset")?;
+    reject_unexpected_uniforms(pass, &["u_lift", "u_gamma", "u_gain", "u_offset"])?;
+
+    Ok(EffectUniformBuffer {
+        resolution: [width as f32, height as f32],
+        direction: [0.0, 0.0],
+        scalars: [lift, gamma, gain, offset],
     })
 }
 
