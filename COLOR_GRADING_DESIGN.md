@@ -232,9 +232,24 @@ Ranked by how much new Rust work each needs, cheapest first:
    ways: a 3-column test confirms columns don't leak into each other and that two
    distinct luma values in one column stay as two separate buckets rather than being
    merged, and a 4-pixel gradient test confirms each column gets its own distinct
-   expected bucket. Vectorscope and parade remain; Action/UI wiring for both histogram
-   and waveform (making the data queryable/displayable, not just computable in Rust) is a
-   separate, not-yet-started follow-up.
+   expected bucket. **Vectorscope also closed 2026-08-06** (`effects::compute_vectorscope`)
+   — full-swing BT.601 Cb/Cr binned directly into a 256x256 grid (both axes already
+   0..255, no extra scaling needed). Verified achromatic grays (R=G=B) land at the exact
+   center bucket (128,128) at every brightness level, not just white/black — BT.601's
+   Cb/Cr coefficients sum to exactly 0.5 on each side — and that pure red/green/blue land
+   at three distinct, non-overlapping buckets matching an independently-written reference
+   implementation. Computes the bucket grid only, not hue-angle target overlays
+   (skin-tone line, color targets) a real vectorscope draws on top — stated scope.
+   **Parade also closed 2026-08-06** (`effects::compute_parade`) — structurally
+   `waveform.rs` generalized from one collapsed luma channel to three independent R/G/B
+   channels. Verified with a color (10,200,90) chosen specifically so cross-channel
+   leakage would be visible: each channel spikes only at its own value, with explicit
+   assertions the other two channels are zero at that value. **All four scope types' core
+   computations are now closed.** Action/UI wiring (making histogram/waveform/
+   vectorscope/parade data queryable/displayable, not just computable in Rust) is a
+   separate, not-yet-started follow-up for all four — these are read-only analysis
+   primitives with no registered Action reaching them yet, a real gap distinct from the
+   computation itself being done.
 
 ## What 4b should NOT assume
 

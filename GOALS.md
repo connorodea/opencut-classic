@@ -225,9 +225,10 @@ pixel-level correctness explicitly gated on the still-unresolved WebGPU renderin
 blocker, not assumed solved.
 
 **Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels, log wheels,
-HSL qualifier, luma curve, LUT import/apply, and the serial node graph closed; scopes
-in progress (histogram + waveform core computation done, vectorscope/parade + all
-Action/UI wiring for scopes still open).
+HSL qualifier, luma curve, LUT import/apply, the serial node graph, and all four scopes'
+core computations (histogram/waveform/vectorscope/parade) closed. Remaining: Action/UI
+wiring to make scope data actually queryable/displayable (currently Rust-only
+computation with no registered Action reaching it) — the last gap in Phase 1's scope.
 **Explicit sequencing override, recorded rather
 than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
 both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
@@ -332,9 +333,16 @@ release once one override happens.
   also done 2026-08-06** (`effects::compute_waveform`) — per-column luma histograms,
   full horizontal resolution; verified columns stay independent (no cross-column
   leakage) and that two distinct luma values in one column stay as two separate buckets
-  rather than being merged. Vectorscope/parade and all Action/UI wiring (making scope
-  data queryable, not just computable in Rust) remain open — these are two scope types'
-  core computations, not the whole item.
+  rather than being merged. **Vectorscope and parade also done 2026-08-06**
+  (`effects::compute_vectorscope`, `effects::compute_parade`) — full-swing BT.601 Cb/Cr
+  binned into a 256x256 grid (achromatic grays verified to land exactly at center at
+  every brightness; distinct hues verified to land at distinct, independently-predicted
+  buckets), and parade as `waveform.rs` generalized from one collapsed luma channel to
+  three independent R/G/B channels (verified with a color chosen so cross-channel
+  leakage would be visible, asserting the other two channels are zero at each channel's
+  own spike). **All four scope types' core computations are closed.** Only Action/UI
+  wiring remains — these are read-only Rust computations with no registered Action
+  reaching them yet, a distinct, real gap from the computation itself being correct.
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via
