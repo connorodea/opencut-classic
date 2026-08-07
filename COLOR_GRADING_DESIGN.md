@@ -298,6 +298,28 @@ Ranked by how much new Rust work each needs, cheapest first:
    the temp/tint channel scaling are a defensible, clean approximation, explicitly not a
    verified match to DaVinci's proprietary math — same honesty standard as log wheels'
    own doc comment.
+10. **RGB curves — a second gap-map correction, caught and closed 2026-08-06.** This
+    doc's own data-model design table (above) planned `"rgb-curves"` and `"luma-curve"`
+    as two separate `EffectDefinition`s, but only luma-curve was ever built — which
+    applies one shared curve identically to all three channels, not the independent
+    per-channel curves DaVinci's RGB Curves panel gives. Silently dropped when item 4
+    closed, never recorded as a deliberate scope-out. Found the same way as item 9: still
+    blocked on the scopes npm-publish step, re-reading this doc rather than idling.
+
+    Needed 15 independent scalar uniforms (5 control points x 3 channels) — more than
+    `scalars`/`scalars_b`'s 8 free floats. Extended `EffectUniformBuffer` again with
+    `scalars_c`/`scalars_d`, verified backward-compatible by re-running
+    `cargo test --workspace` *before* writing the new shader, not assumed safe.
+    `rgb_curves.wgsl` reuses the exact same `catmull_rom`/`eval_curve` math and
+    boundary-extrapolation fix already proven in `luma_curve.wgsl`, evaluated three
+    times with independent control points instead of once shared. The critical test
+    isn't "the curve math is right" (already proven identical for luma-curve) — it's
+    that changing only red's curve leaves green/blue provably untouched, verified on
+    native GPU, plus all three channels independently matching their own hand-computed
+    reference with genuinely different deltas (ruling out a shared-curve regression, the
+    luma-curve bug's own failure class). TS side: 15 number params, headless proof sets
+    15 genuinely distinct values (not one repeated) so a channel-collapsing bug at the
+    Action/state layer would show up there too, not just in the shader.
 
 ## What 4b should NOT assume
 

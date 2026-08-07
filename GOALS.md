@@ -228,8 +228,8 @@ always included "basic RAW exposure/WB/temp-tint controls," but 4a's gap-map and
 clause both missed it; see `COLOR_GRADING_DESIGN.md` gap-map item 9 for the correction.)_
 
 **Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels, log wheels,
-HSL qualifier, luma curve, LUT import/apply, the serial node graph, exposure +
-white-balance, and all four scopes' core computations (histogram/waveform/vectorscope/
+HSL qualifier, luma curve, rgb curves, LUT import/apply, the serial node graph, exposure
++ white-balance, and all four scopes' core computations (histogram/waveform/vectorscope/
 parade) closed. Scopes' Action/UI
 wiring in progress: WASM bindings (`rust/wasm/src/scopes.rs`, committed) and a TS
 service layer (`@/services/color-scope/service.ts`, written + verified via local link,
@@ -380,6 +380,19 @@ release once one override happens.
   double/halve, positive temperature measurably warms and positive tint measurably
   shifts toward magenta, matching the shaders' own documented coefficients — plus the
   usual headless state-persistence proofs for both.
+  **RGB curves done 2026-08-06 — a second gap-map correction.** 4a's original
+  data-model table planned `"rgb-curves"` and `"luma-curve"` as separate
+  `EffectDefinition`s, but only luma-curve was built — which shares one curve across
+  all three channels, not the independent-per-channel curves DaVinci's RGB Curves panel
+  gives. Silently dropped when item 4 closed; found the same way as the exposure/WB
+  miss, re-reading the design doc while still blocked on the npm publish. Needed 15
+  scalar uniforms (5 points x 3 channels), more than `scalars`/`scalars_b` held —
+  extended `EffectUniformBuffer` with `scalars_c`/`scalars_d`, re-verified
+  `cargo test --workspace` clean *before* writing the new shader. Reuses luma-curve's
+  proven Catmull-Rom math/boundary fix three times over. The test that actually matters
+  here isn't curve correctness (already proven) — it's that changing only red's curve
+  leaves green/blue provably untouched on native GPU, plus all three channels
+  independently matching their own reference with genuinely different deltas.
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via
