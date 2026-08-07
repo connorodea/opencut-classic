@@ -225,7 +225,8 @@ pixel-level correctness explicitly gated on the still-unresolved WebGPU renderin
 blocker, not assumed solved.
 
 **Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels, log wheels,
-and HSL qualifier closed (3 more subsystems in the gap-map's ranked order). **Explicit sequencing override, recorded rather
+HSL qualifier, and luma curve closed (2 more subsystems in the gap-map's ranked order).
+**Explicit sequencing override, recorded rather
 than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
 both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
 gated behind Goal 3 passing, and Goal 3 has not passed — it's still blocked on a
@@ -290,7 +291,13 @@ release once one override happens.
   it's a genuinely different technique (geometric SDF masks, not color keying) and
   said so rather than forcing a fit. Does not gate a downstream chained correction
   (full secondary grading) — real, separate, deferred pipeline work, stated explicitly.
-  RGB/luma curves next, per the gap-map's ranked order.
+  **Luma curve done 2026-08-06, scoped down from the original plan** — a fixed 5-point
+  Catmull-Rom spline evaluated from uniform scalars instead of the texture-backed LUT
+  originally assumed necessary (needed zero new pipeline infrastructure). Caught and
+  fixed a real boundary-condition bug via the test itself (an "identity" curve was
+  silently distorting input near the edges) rather than shipping on the first green
+  build. LUT import/apply next, per the gap-map's ranked order — now the item that
+  actually introduces texture-backed passes.
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via

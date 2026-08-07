@@ -149,11 +149,29 @@ Ranked by how much new Rust work each needs, cheapest first:
    two-way verification as the wheels (native-GPU pixel tests + headless
    state-persistence proof, both pass). RGB-channel-based qualification (a distinct
    color model from HSL) remains a smaller, separate follow-up if needed later.
-4. **RGB/luma curves** — needs the LUT-texture-sampling shader pattern, a genuinely new
-   shape of Rust work (not just a new uniform set).
+4. **Luma curve — closed 2026-08-06, scoped down from the original plan.** This gap-map
+   originally assumed curves would need the LUT-texture-sampling pattern (a new kind of
+   Rust work — texture binding, not just uniforms). Shipped a smaller, real alternative
+   instead: a fixed 5-point Catmull-Rom spline (`luma_curve.wgsl`) evaluated analytically
+   from uniform scalars, applied identically to R/G/B — needed zero new pipeline
+   infrastructure, fits the existing `scalars`/`scalars_b` slots exactly. Arbitrary-
+   point, texture-backed curves (DaVinci's actual curve editor) remain the larger,
+   deferred version, stated explicitly in the shader's own doc comment. **Caught a real
+   bug via the test, not shipped on assumption**: the first boundary-condition choice
+   (duplicate the endpoint as the missing virtual control point) is a common Catmull-Rom
+   convention but doesn't preserve linearity at the edges — an identity curve measurably
+   distorted input near the boundaries. Traced by hand (shader output matched an
+   independent Rust reference exactly, so the bug was the boundary-condition choice
+   itself, not an implementation slip) and fixed with linear extrapolation for the
+   virtual points instead. Same two-way verification as everything else (native-GPU
+   pixel tests, including the one that caught the bug, + headless state-persistence
+   proof, both pass now).
 5. **LUT import/apply** — TS-side `.cube` parser (new, small) + a generic 3D-LUT-
-   sampling shader (reusable across (2) and (4) if built as infrastructure rather than
-   bespoke).
+   sampling shader. **Correction**: originally expected to reuse texture-binding
+   infrastructure item 4 (curves) would have built — curves shipped without that
+   infrastructure instead (an analytical uniform-based approach turned out to fit the
+   scope better), so this is now the item that actually introduces texture-backed
+   effect passes to the pipeline for the first time, not a reuse.
 6. **Serial node graph** — free (already the effects list's behavior); document it as
    such rather than building anything new.
 7. **Parallel node graph** — real new data-model work, recommend deferring past 4b's
