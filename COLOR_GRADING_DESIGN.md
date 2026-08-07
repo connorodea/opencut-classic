@@ -133,8 +133,22 @@ Ranked by how much new Rust work each needs, cheapest first:
    headless state-persistence proof, both pass). Extracted a shared
    `grading-proof-helpers.ts` after this became the second copy of the same proof
    pattern — worth it now that more subsystems will repeat it.
-3. **HSL/RGB/luma qualifiers** — check `rust/crates/masks` first; may already have
-   relevant keying primitives to extend rather than starting from zero.
+3. **HSL qualifier — closed 2026-08-06.** Checked `rust/crates/masks` first as
+   recommended — a dead end, confirmed not assumed: it's SDF/Jump-Flood-Algorithm
+   geometric masks (box/circle/freeform paths), not color-based keying, genuinely
+   different technique. Shipped DaVinci's qualifier "Highlight" preview mode instead
+   (`hsl_qualifier.wgsl`): H/S/L range membership with soft edges, matching pixels stay
+   full color, everything else dims to grayscale. Explicitly does NOT implement full
+   secondary grading (gating a downstream chained correction by the qualifier's matte)
+   — the effect pipeline applies passes sequentially with no matte hand-off between
+   them; that's real, separate, deferred pipeline-architecture work, stated as such in
+   the shader's own doc comment. Required extending the shared `EffectUniformBuffer`
+   with a second `scalars_b: [f32;4]` slot (qualifiers need 7 values, more than the
+   original 4-float `scalars` holds) — verified backward-compatible by re-running the
+   wheels tests after the extension, not assumed safe from the WGSL spec alone. Same
+   two-way verification as the wheels (native-GPU pixel tests + headless
+   state-persistence proof, both pass). RGB-channel-based qualification (a distinct
+   color model from HSL) remains a smaller, separate follow-up if needed later.
 4. **RGB/luma curves** — needs the LUT-texture-sampling shader pattern, a genuinely new
    shape of Rust work (not just a new uniform set).
 5. **LUT import/apply** — TS-side `.cube` parser (new, small) + a generic 3D-LUT-
