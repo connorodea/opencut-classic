@@ -7,6 +7,7 @@ import { lumaCurveEffectDefinition } from "./luma-curve";
 import { lutEffectDefinition } from "./lut";
 import { exposureEffectDefinition } from "./exposure";
 import { whiteBalanceEffectDefinition } from "./white-balance";
+import { rgbCurvesEffectDefinition } from "./rgb-curves";
 
 const defaultEffects = [
 	blurEffectDefinition,
@@ -17,6 +18,7 @@ const defaultEffects = [
 	lutEffectDefinition,
 	exposureEffectDefinition,
 	whiteBalanceEffectDefinition,
+	rgbCurvesEffectDefinition,
 ];
 
 export function registerDefaultEffects(): void {
