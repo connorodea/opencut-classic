@@ -4,6 +4,7 @@ import { primaryWheelsEffectDefinition } from "./primary-wheels";
 import { logWheelsEffectDefinition } from "./log-wheels";
 import { hslQualifierEffectDefinition } from "./hsl-qualifier";
 import { lumaCurveEffectDefinition } from "./luma-curve";
+import { lutEffectDefinition } from "./lut";
 
 const defaultEffects = [
 	blurEffectDefinition,
@@ -11,6 +12,7 @@ const defaultEffects = [
 	logWheelsEffectDefinition,
 	hslQualifierEffectDefinition,
 	lumaCurveEffectDefinition,
+	lutEffectDefinition,
 ];
 
 export function registerDefaultEffects(): void {

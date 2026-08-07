@@ -225,7 +225,8 @@ pixel-level correctness explicitly gated on the still-unresolved WebGPU renderin
 blocker, not assumed solved.
 
 **Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels, log wheels,
-HSL qualifier, and luma curve closed (2 more subsystems in the gap-map's ranked order).
+HSL qualifier, luma curve, and LUT import/apply closed (serial node graph + scopes left
+in the gap-map's ranked order).
 **Explicit sequencing override, recorded rather
 than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
 both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
@@ -296,8 +297,24 @@ release once one override happens.
   originally assumed necessary (needed zero new pipeline infrastructure). Caught and
   fixed a real boundary-condition bug via the test itself (an "identity" curve was
   silently distorting input near the edges) rather than shipping on the first green
-  build. LUT import/apply next, per the gap-map's ranked order — now the item that
-  actually introduces texture-backed passes.
+  build. **LUT import/apply done 2026-08-06** — the item that actually introduces
+  texture-backed passes to the pipeline (a new `lut_pipeline_layout`/3rd bind group,
+  since wgpu bakes bind-group layouts in at pipeline creation and the shared 2-group
+  layout couldn't grow one). 3D LUT stored as a tiled-2D texture (9 tiles of 9x9, one
+  per blue slice), sampled nearest-neighbor via `textureLoad` rather than trilinear —
+  avoids cross-tile bleed a filtering sampler would cause at tile edges. Fixed 9^3 grid,
+  not real `.cube` files' 17/33/65 — a TS-side parser (`parse-cube.ts`) nearest-neighbor
+  resamples any source size down to fit, with its own `bun:test` suite (parse, resample,
+  identity-preservation). LUT data itself flows through the existing
+  `UniformValue::Vector` wire format unchanged — confirmed no new FFI plumbing was
+  needed by reading `rust/wasm/src/effects.rs` before writing any code. Stored on the
+  effect as a JSON-encoded flat array in a `text` param (no array/blob `ParamValue`
+  type exists) — documented as a real v1, not the eventual LUT-library architecture.
+  Same two-way verification as everything else (5 native-GPU pixel tests incl. an
+  independently-predicted channel-swap case + headless state-persistence proof, all
+  pass). Serial node graph next, per the gap-map's ranked order — expected to already
+  be free (the effects list's existing ordering), needing verification/documentation
+  rather than new building.
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via

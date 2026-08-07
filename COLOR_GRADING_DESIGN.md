@@ -166,12 +166,31 @@ Ranked by how much new Rust work each needs, cheapest first:
    virtual points instead. Same two-way verification as everything else (native-GPU
    pixel tests, including the one that caught the bug, + headless state-persistence
    proof, both pass now).
-5. **LUT import/apply** — TS-side `.cube` parser (new, small) + a generic 3D-LUT-
-   sampling shader. **Correction**: originally expected to reuse texture-binding
-   infrastructure item 4 (curves) would have built — curves shipped without that
-   infrastructure instead (an analytical uniform-based approach turned out to fit the
-   scope better), so this is now the item that actually introduces texture-backed
-   effect passes to the pipeline for the first time, not a reuse.
+5. **LUT import/apply — closed 2026-08-06.** The item that actually introduces
+   texture-backed effect passes to the pipeline for the first time (see the item-4
+   correction above). Required a genuinely new shape of Rust work: LUT data flows
+   through the existing `UniformValue::Vector` wire format (already arbitrary-length —
+   no new FFI plumbing needed, confirmed by reading `rust/wasm/src/effects.rs`), but
+   `pack_effect_uniforms`/`apply_with_encoder` had no mechanism to turn a large vector
+   into a bound GPU texture. Since wgpu bakes bind-group layouts into a pipeline at
+   creation time, the shared 2-bind-group `pipeline_layout` couldn't grow a 3rd group —
+   built a separate `lut_pipeline_layout` + `lut-3d` shader/pipeline instead. The 3D LUT
+   is stored as a tiled 2D texture (LUT_SIZE tiles of LUT_SIZE x LUT_SIZE, one tile per
+   blue slice) sampled via `textureLoad` at nearest-neighbor integer coordinates —
+   deliberately not trilinear, and deliberately not a native `wgpu::TextureDimension::D3`
+   texture, both stated as scope choices in `lut_3d.wgsl`'s doc comment (nearest-neighbor
+   avoids the cross-tile-bleed a filtering sampler would cause at tile edges; 2D-tiled
+   avoids native-3D-texture-support questions). Fixed at a 9x9x9 grid (729 points), not
+   the 17/33/65 sizes real `.cube` files ship at — the TS-side parser (`parse-cube.ts`)
+   nearest-neighbor resamples any source size down to 9^3 to fit. Verified on native GPU:
+   identity LUT leaves grid-aligned inputs unchanged, an independently-predicted R/B
+   channel-swap LUT matches, intensity=0 fully bypasses the LUT, and malformed LUT
+   data/unknown uniforms are rejected — plus a `bun:test` suite for the `.cube` parser
+   itself (parsing, resampling, identity-preservation) and the usual headless
+   state-persistence proof. LUT data is stored on the effect as a JSON-encoded flat
+   array in a `text` param (`ParamValues` has no array/blob type) — a real, working v1,
+   not the eventual LUT-library/file-reference architecture DaVinci parity would want
+   long-term; noted explicitly in `lut.ts`'s doc comment so it isn't mistaken for final.
 6. **Serial node graph** — free (already the effects list's behavior); document it as
    such rather than building anything new.
 7. **Parallel node graph** — real new data-model work, recommend deferring past 4b's

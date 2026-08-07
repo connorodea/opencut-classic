@@ -31,7 +31,7 @@ export async function proveGradingEffectPersistence({
 }: {
 	projectName: string;
 	effectType: string;
-	params: Record<string, number>;
+	params: Record<string, number | string | boolean>;
 }): Promise<void> {
 	const editor = EditorCore.getInstance();
 
