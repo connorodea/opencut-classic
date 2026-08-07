@@ -19,6 +19,10 @@ const LUMA_CURVE_SHADER_ID: &str = "luma-curve";
 const LUMA_CURVE_SHADER_SOURCE: &str = include_str!("shaders/luma_curve.wgsl");
 const LUT_3D_SHADER_ID: &str = "lut-3d";
 const LUT_3D_SHADER_SOURCE: &str = include_str!("shaders/lut_3d.wgsl");
+const EXPOSURE_SHADER_ID: &str = "exposure";
+const EXPOSURE_SHADER_SOURCE: &str = include_str!("shaders/exposure.wgsl");
+const WHITE_BALANCE_SHADER_ID: &str = "white-balance";
+const WHITE_BALANCE_SHADER_SOURCE: &str = include_str!("shaders/white_balance.wgsl");
 
 /// Grid resolution per axis of the tiled-2D 3D LUT texture (9x9x9 = 729
 /// points). Must match the `LUT_SIZE` constant declared in lut_3d.wgsl --
@@ -177,6 +181,20 @@ impl EffectPipeline {
                 .create_shader_module(wgpu::ShaderModuleDescriptor {
                     label: Some("effects-lut-3d-shader"),
                     source: wgpu::ShaderSource::Wgsl(LUT_3D_SHADER_SOURCE.into()),
+                });
+        let exposure_shader_module =
+            context
+                .device()
+                .create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("effects-exposure-shader"),
+                    source: wgpu::ShaderSource::Wgsl(EXPOSURE_SHADER_SOURCE.into()),
+                });
+        let white_balance_shader_module =
+            context
+                .device()
+                .create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("effects-white-balance-shader"),
+                    source: wgpu::ShaderSource::Wgsl(WHITE_BALANCE_SHADER_SOURCE.into()),
                 });
         let pipeline_layout =
             context
@@ -386,6 +404,78 @@ impl EffectPipeline {
                     multiview_mask: None,
                     cache: None,
                 });
+        let exposure_pipeline =
+            context
+                .device()
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("effects-exposure-pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vertex_shader_module,
+                        entry_point: Some("vertex_main"),
+                        buffers: &[wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<[f32; 2]>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &[wgpu::VertexAttribute {
+                                format: wgpu::VertexFormat::Float32x2,
+                                offset: 0,
+                                shader_location: 0,
+                            }],
+                        }],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &exposure_shader_module,
+                        entry_point: Some("fragment_main"),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: context.texture_format(),
+                            blend: None,
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
+        let white_balance_pipeline =
+            context
+                .device()
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("effects-white-balance-pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vertex_shader_module,
+                        entry_point: Some("vertex_main"),
+                        buffers: &[wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<[f32; 2]>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &[wgpu::VertexAttribute {
+                                format: wgpu::VertexFormat::Float32x2,
+                                offset: 0,
+                                shader_location: 0,
+                            }],
+                        }],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &white_balance_shader_module,
+                        entry_point: Some("fragment_main"),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: context.texture_format(),
+                            blend: None,
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
         let lut_3d_pipeline =
             context
                 .device()
@@ -435,6 +525,8 @@ impl EffectPipeline {
             ),
             (LUMA_CURVE_SHADER_ID.to_string(), luma_curve_pipeline),
             (LUT_3D_SHADER_ID.to_string(), lut_3d_pipeline),
+            (EXPOSURE_SHADER_ID.to_string(), exposure_pipeline),
+            (WHITE_BALANCE_SHADER_ID.to_string(), white_balance_pipeline),
         ]);
 
         Self {
@@ -601,6 +693,8 @@ fn pack_effect_uniforms(
         HSL_QUALIFIER_SHADER_ID => pack_hsl_qualifier_uniforms(pass, width, height),
         LUMA_CURVE_SHADER_ID => pack_luma_curve_uniforms(pass, width, height),
         LUT_3D_SHADER_ID => pack_lut_uniforms(pass, width, height),
+        EXPOSURE_SHADER_ID => pack_exposure_uniforms(pass, width, height),
+        WHITE_BALANCE_SHADER_ID => pack_white_balance_uniforms(pass, width, height),
         _ => Err(EffectsError::UnknownEffectShader {
             shader: shader.to_string(),
         }),
@@ -842,6 +936,39 @@ fn create_lut_texture(
 
 fn to_unorm_byte(value: f32) -> u8 {
     (value.clamp(0.0, 1.0) * 255.0).round() as u8
+}
+
+fn pack_exposure_uniforms(
+    pass: &EffectPass,
+    width: u32,
+    height: u32,
+) -> Result<EffectUniformBuffer, EffectsError> {
+    let ev = read_number_uniform(pass, "u_ev")?;
+    reject_unexpected_uniforms(pass, &["u_ev"])?;
+
+    Ok(EffectUniformBuffer {
+        resolution: [width as f32, height as f32],
+        direction: [0.0, 0.0],
+        scalars: [ev, 0.0, 0.0, 0.0],
+        scalars_b: [0.0; 4],
+    })
+}
+
+fn pack_white_balance_uniforms(
+    pass: &EffectPass,
+    width: u32,
+    height: u32,
+) -> Result<EffectUniformBuffer, EffectsError> {
+    let temperature = read_number_uniform(pass, "u_temperature")?;
+    let tint = read_number_uniform(pass, "u_tint")?;
+    reject_unexpected_uniforms(pass, &["u_temperature", "u_tint"])?;
+
+    Ok(EffectUniformBuffer {
+        resolution: [width as f32, height as f32],
+        direction: [0.0, 0.0],
+        scalars: [temperature, tint, 0.0, 0.0],
+        scalars_b: [0.0; 4],
+    })
 }
 
 fn read_number_uniform(pass: &EffectPass, uniform: &str) -> Result<f32, EffectsError> {

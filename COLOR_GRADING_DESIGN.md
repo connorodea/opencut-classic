@@ -276,6 +276,29 @@ Ranked by how much new Rust work each needs, cheapest first:
    the publish + repin lands, and this session doesn't leave new tsc errors in the
    default checkout state.
 
+9. **Exposure + white balance/tint — missed by this gap-map's original v1.0 audit,
+   caught and corrected 2026-08-06.** The Goal 4 northstar-cascade instruction's original
+   Phase 1 scope explicitly included "basic RAW exposure/WB/temp-tint controls" alongside
+   wheels/curves/qualifiers/node-graph/LUTs — this table (data-model design, above) and
+   the gap-map's items 1-8 simply never listed it, and neither did `GOALS.md`'s Goal 4
+   "Done when" clause. Not a deliberate scope-out with reasoning recorded (the way, say,
+   per-channel RGB color-balance wheels or arbitrary-point curves were) — a genuine miss,
+   the same class of mistake `GOALS.md` itself warns 4b not to repeat (Goal 1's original
+   v0.1 gap-map missed 3 methods). Found while blocked on the npm-publish step above and
+   re-reading this doc end to end rather than idling.
+
+   Scoped down the same way every other primitive here was: **not** DaVinci's actual RAW
+   page (that operates on true camera sensor RAW data — BRAW/RED RAW decode, which this
+   codebase has no decode-level support for anywhere, an architecturally much bigger gap
+   than a color-grading shader). Built as two ordinary `EffectDefinition`s, same shape as
+   primary wheels: `exposure` (single EV-stops scalar, `output = input * 2^ev`) and
+   `white-balance` (temperature + tint as relative correction sliders, not an absolute
+   Kelvin/blackbody-radiation conversion — DaVinci's own WB temp slider is also a
+   relative correction, not a from-scratch colorimetric computation). Coefficients for
+   the temp/tint channel scaling are a defensible, clean approximation, explicitly not a
+   verified match to DaVinci's proprietary math — same honesty standard as log wheels'
+   own doc comment.
+
 ## What 4b should NOT assume
 
 - That adding a grading effect is "just write TypeScript" — it's TypeScript *and* Rust,
