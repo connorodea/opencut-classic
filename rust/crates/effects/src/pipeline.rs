@@ -15,6 +15,8 @@ const LOG_WHEELS_SHADER_ID: &str = "log-wheels";
 const LOG_WHEELS_SHADER_SOURCE: &str = include_str!("shaders/log_wheels.wgsl");
 const HSL_QUALIFIER_SHADER_ID: &str = "hsl-qualifier";
 const HSL_QUALIFIER_SHADER_SOURCE: &str = include_str!("shaders/hsl_qualifier.wgsl");
+const LUMA_CURVE_SHADER_ID: &str = "luma-curve";
+const LUMA_CURVE_SHADER_SOURCE: &str = include_str!("shaders/luma_curve.wgsl");
 
 pub struct ApplyEffectsOptions<'a> {
     pub source: &'a wgpu::Texture,
@@ -118,6 +120,13 @@ impl EffectPipeline {
                 .create_shader_module(wgpu::ShaderModuleDescriptor {
                     label: Some("effects-hsl-qualifier-shader"),
                     source: wgpu::ShaderSource::Wgsl(HSL_QUALIFIER_SHADER_SOURCE.into()),
+                });
+        let luma_curve_shader_module =
+            context
+                .device()
+                .create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("effects-luma-curve-shader"),
+                    source: wgpu::ShaderSource::Wgsl(LUMA_CURVE_SHADER_SOURCE.into()),
                 });
         let pipeline_layout =
             context
@@ -274,6 +283,42 @@ impl EffectPipeline {
                     multiview_mask: None,
                     cache: None,
                 });
+        let luma_curve_pipeline =
+            context
+                .device()
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("effects-luma-curve-pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vertex_shader_module,
+                        entry_point: Some("vertex_main"),
+                        buffers: &[wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<[f32; 2]>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &[wgpu::VertexAttribute {
+                                format: wgpu::VertexFormat::Float32x2,
+                                offset: 0,
+                                shader_location: 0,
+                            }],
+                        }],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &luma_curve_shader_module,
+                        entry_point: Some("fragment_main"),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: context.texture_format(),
+                            blend: None,
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
         let pipelines = HashMap::from([
             (GAUSSIAN_BLUR_SHADER_ID.to_string(), gaussian_blur_pipeline),
             (
@@ -285,6 +330,7 @@ impl EffectPipeline {
                 HSL_QUALIFIER_SHADER_ID.to_string(),
                 hsl_qualifier_pipeline,
             ),
+            (LUMA_CURVE_SHADER_ID.to_string(), luma_curve_pipeline),
         ]);
 
         Self {
@@ -426,6 +472,7 @@ fn pack_effect_uniforms(
         PRIMARY_WHEELS_SHADER_ID => pack_primary_wheels_uniforms(pass, width, height),
         LOG_WHEELS_SHADER_ID => pack_log_wheels_uniforms(pass, width, height),
         HSL_QUALIFIER_SHADER_ID => pack_hsl_qualifier_uniforms(pass, width, height),
+        LUMA_CURVE_SHADER_ID => pack_luma_curve_uniforms(pass, width, height),
         _ => Err(EffectsError::UnknownEffectShader {
             shader: shader.to_string(),
         }),
@@ -534,6 +581,26 @@ fn pack_hsl_qualifier_uniforms(
         direction: [0.0, 0.0],
         scalars: [hue_center, hue_width, sat_center, sat_width],
         scalars_b: [lum_center, lum_width, softness, 0.0],
+    })
+}
+
+fn pack_luma_curve_uniforms(
+    pass: &EffectPass,
+    width: u32,
+    height: u32,
+) -> Result<EffectUniformBuffer, EffectsError> {
+    let y0 = read_number_uniform(pass, "u_y0")?;
+    let y1 = read_number_uniform(pass, "u_y1")?;
+    let y2 = read_number_uniform(pass, "u_y2")?;
+    let y3 = read_number_uniform(pass, "u_y3")?;
+    let y4 = read_number_uniform(pass, "u_y4")?;
+    reject_unexpected_uniforms(pass, &["u_y0", "u_y1", "u_y2", "u_y3", "u_y4"])?;
+
+    Ok(EffectUniformBuffer {
+        resolution: [width as f32, height as f32],
+        direction: [0.0, 0.0],
+        scalars: [y0, y1, y2, y3],
+        scalars_b: [y4, 0.0, 0.0, 0.0],
     })
 }
 
