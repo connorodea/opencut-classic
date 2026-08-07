@@ -245,11 +245,36 @@ Ranked by how much new Rust work each needs, cheapest first:
    channels. Verified with a color (10,200,90) chosen specifically so cross-channel
    leakage would be visible: each channel spikes only at its own value, with explicit
    assertions the other two channels are zero at that value. **All four scope types' core
-   computations are now closed.** Action/UI wiring (making histogram/waveform/
-   vectorscope/parade data queryable/displayable, not just computable in Rust) is a
-   separate, not-yet-started follow-up for all four — these are read-only analysis
-   primitives with no registered Action reaching them yet, a real gap distinct from the
-   computation itself being done.
+   computations are now closed.** Action/UI wiring in progress: extracted each
+   `compute_*` function into a GPU-independent `compute_*_from_pixels(pixels, width,
+   height, is_bgra)` (behavior-preserving refactor, all 9 existing tests re-verified
+   unchanged) so it can bind directly to already-in-hand tightly-packed RGBA8 bytes
+   (e.g. canvas `ImageData.data`) with zero WebGPU/rendering dependency — unlike the
+   effects shader pipeline, which needs a live `wgpu::Texture` to run at all. This makes
+   scopes the first grading-arc capability genuinely pixel-verifiable through the real
+   JS/WASM bridge in this session's headless Bun environment (`rust/wasm/src/
+   scopes.rs`'s `computeHistogram`/`computeWaveform`/`computeVectorscope`/
+   `computeParade`, verified end to end via `headless/scopes-wasm-proof.ts` and a thin
+   `@/services/color-scope/service.ts` dispatch wrapper mirroring this codebase's own
+   `waveformCache` precedent for "queryable derived analysis data, not a registered
+   Action").
+
+   **Real packaging gap surfaced doing this, not a code bug:** `apps/web` pins
+   `opencut-wasm` to upstream's published `^0.2.10`, not this fork's local Rust build —
+   already known from earlier in the session ("local Rust changes don't automatically
+   propagate"), but this is the first time it had visible consequences: the new WASM
+   exports aren't reachable without a manual `bun link`, and leaving that link in place
+   broke `bun test` for unrelated files (bare Bun can't load a wasm-pack "bundler"-target
+   `.wasm` without the same preload shim `headless/wasm-bindgen-bun-plugin.ts` exists
+   for). Surfaced to the user via `AskUserQuestion` rather than deciding silently, since
+   it's a real build-pipeline tradeoff; **user chose to publish this fork's own scoped
+   package** (`@connorodea/opencut-wasm`). `rust/wasm/Cargo.toml` bumped to 0.3.0,
+   `repository` repointed at this fork, package built and ready — publish itself blocked
+   on npm auth in this environment (asked the user to run `npm login`). The TS service
+   layer and its 2 headless proofs are written and verified via the documented local-link
+   dev flow, but deliberately not committed yet — they'd fail typecheck by default until
+   the publish + repin lands, and this session doesn't leave new tsc errors in the
+   default checkout state.
 
 ## What 4b should NOT assume
 

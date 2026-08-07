@@ -226,9 +226,27 @@ blocker, not assumed solved.
 
 **Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels, log wheels,
 HSL qualifier, luma curve, LUT import/apply, the serial node graph, and all four scopes'
-core computations (histogram/waveform/vectorscope/parade) closed. Remaining: Action/UI
-wiring to make scope data actually queryable/displayable (currently Rust-only
-computation with no registered Action reaching it) — the last gap in Phase 1's scope.
+core computations (histogram/waveform/vectorscope/parade) closed. Scopes' Action/UI
+wiring in progress: WASM bindings (`rust/wasm/src/scopes.rs`, committed) and a TS
+service layer (`@/services/color-scope/service.ts`, written + verified via local link,
+not yet committed) are done, both real-verified through the actual JS/WASM bridge —
+**blocked on a real packaging gap**, not a code problem: `apps/web` depends on
+upstream's published `opencut-wasm@^0.2.10`, which doesn't have this fork's new Rust
+work at all (not just scopes — none of Goal 4's shaders reach the shipped app without a
+publish). User decided (2026-08-06): publish this fork's own scoped package
+(`@connorodea/opencut-wasm`). `rust/wasm/Cargo.toml` bumped to 0.3.0 and repointed at
+this fork's repo, `rust/wasm/pkg` built and ready — **publish itself blocked on npm
+auth** (`npm whoami` returns 401 in this environment; asked the user to run `npm login`
+via the `!` prompt prefix). The moment auth completes: `npm publish --access public`
+from `rust/wasm/pkg`, repin `apps/web/package.json`, update ~31 import sites from
+`"opencut-wasm"` to `"@connorodea/opencut-wasm"`, `bun install`, re-verify tsc/tests,
+commit the already-written service.ts + 2 headless proof scripts. Not blocking: a visual
+scope-panel UI component (displaying the data graphically) is a separate, larger,
+not-yet-started stretch beyond what "Done when" strictly requires — Goal 4's framing is
+"documented, agent-drivable Action surface," and `computeFrameScope`/
+`computeFrameScopeFromImageData` already satisfy "queryable" the same way
+`waveformCache.getSourceSummary` (this codebase's own audio-waveform precedent) is
+agent-callable without ever being wired into the formal Action/keybinding system.
 **Explicit sequencing override, recorded rather
 than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
 both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
