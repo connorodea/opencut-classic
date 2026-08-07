@@ -224,7 +224,8 @@ and headlessly verifiable — the same rigor `GAP_MAP.md` established for Goal 1
 pixel-level correctness explicitly gated on the still-unresolved WebGPU rendering
 blocker, not assumed solved.
 
-**Status:** in-progress — 4a done 2026-08-06, 4b not started. **Explicit sequencing override, recorded rather
+**Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels closed (5 more
+subsystems in the gap-map's ranked order). **Explicit sequencing override, recorded rather
 than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
 both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
 gated behind Goal 3 passing, and Goal 3 has not passed — it's still blocked on a
@@ -269,13 +270,19 @@ release once one override happens.
   listed order (primary/log wheels → curves → qualifiers → node graph → LUTs → scopes)
   — register each Action per `docs/actions.md`, verify headlessly via
   `apps/web/headless/run.ts` using state-persistence checks (create/mutate/save/reload/
-  confirm), not rendered-output checks, since `HEADLESS_DESIGN.md` v1.5's WebGPU gap
-  blocks real rendering — _advances:_ completes Phase 1's Action surface — _accept:_
+  confirm) — _advances:_ completes Phase 1's Action surface — _accept:_
   gap-map re-run shows zero remaining gaps for Phase 1's defined scope; scopes
   specifically get flagged as state-only-verified (UI/wiring done, pixel-correctness
-  blocked on WebGPU) rather than marked fully done — don't let a scope's accept
-  criteria quietly assume rendering works, the same discipline Goal 2's `export-project`
-  check applied.
+  blocked on the Bun/browser WebGPU gap) rather than marked fully done — don't let a
+  scope's accept criteria quietly assume rendering works, the same discipline Goal 2's
+  `export-project` check applied. **Update:** state-persistence checks turn out not to
+  be the accept-criteria ceiling `HEADLESS_DESIGN.md` v1.5 implied — v1.6's native-GPU
+  finding means real pixel-correctness verification (native `cargo test`, not
+  Bun/browser) is available for shader-backed subsystems (wheels, curves, qualifiers,
+  LUTs); apply it wherever a subsystem has real pixel math to check, not just state.
+  **Primary wheels done 2026-08-06** — see `COLOR_GRADING_DESIGN.md`'s gap-map;
+  verified both ways (native-GPU pixel test + headless state-persistence proof). Log
+  wheels next, per the gap-map's ranked order.
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via

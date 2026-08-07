@@ -112,8 +112,17 @@ Goal 4's own status note about not letting a sub-goal quietly assume rendering w
 
 Ranked by how much new Rust work each needs, cheapest first:
 
-1. **Primary wheels** — one new WGSL shader + the uniform-system generalization (this
-   generalization work benefits every subsequent item, do it once here).
+1. **Primary wheels — closed 2026-08-06.** Master lift/gamma/gain/offset shipped: WGSL
+   shader (`rust/crates/effects/src/shaders/primary_wheels.wgsl`), `pack_effect_uniforms`
+   generalized to be shader-aware (benefits every item below, done once here), TS
+   `EffectDefinition` registered (no new Action types needed, as predicted). Verified
+   two ways, neither standing in for the other: real pixel output on native GPU
+   (`rust/crates/effects/tests/primary_wheels.rs`, matches the documented LGG formula
+   within one 8-bit quantization step) and headless state persistence
+   (`apps/web/headless/primary-wheels-proof.ts`, all four params survive save/reload).
+   Scope note: master/luminance only — per-channel RGB color-balance wheels (the x/y
+   position on DaVinci's actual wheel widget) deliberately deferred, stated in the
+   shader's own doc comment.
 2. **Log wheels** — a second shader, same uniform infra now generalized.
 3. **HSL/RGB/luma qualifiers** — check `rust/crates/masks` first; may already have
    relevant keying primitives to extend rather than starting from zero.
