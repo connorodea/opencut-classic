@@ -17,6 +17,17 @@ const HSL_QUALIFIER_SHADER_ID: &str = "hsl-qualifier";
 const HSL_QUALIFIER_SHADER_SOURCE: &str = include_str!("shaders/hsl_qualifier.wgsl");
 const LUMA_CURVE_SHADER_ID: &str = "luma-curve";
 const LUMA_CURVE_SHADER_SOURCE: &str = include_str!("shaders/luma_curve.wgsl");
+const LUT_3D_SHADER_ID: &str = "lut-3d";
+const LUT_3D_SHADER_SOURCE: &str = include_str!("shaders/lut_3d.wgsl");
+
+/// Grid resolution per axis of the tiled-2D 3D LUT texture (9x9x9 = 729
+/// points). Must match the `LUT_SIZE` constant declared in lut_3d.wgsl --
+/// there is no single source of truth between Rust and WGSL for this, so
+/// both are kept in sync manually and covered by pixel tests that would
+/// fail if they drifted.
+const LUT_SIZE: usize = 9;
+const LUT_GRID_POINTS: usize = LUT_SIZE * LUT_SIZE * LUT_SIZE;
+const LUT_DATA_LEN: usize = LUT_GRID_POINTS * 3;
 
 pub struct ApplyEffectsOptions<'a> {
     pub source: &'a wgpu::Texture,
@@ -27,6 +38,7 @@ pub struct ApplyEffectsOptions<'a> {
 
 pub struct EffectPipeline {
     uniform_bind_group_layout: wgpu::BindGroupLayout,
+    lut_bind_group_layout: wgpu::BindGroupLayout,
     pipelines: HashMap<String, wgpu::RenderPipeline>,
 }
 
@@ -50,6 +62,16 @@ pub enum EffectsError {
     },
     #[error("Shader '{shader}' does not support uniform '{uniform}'")]
     UnsupportedUniform { shader: String, uniform: String },
+    #[error(
+        "Uniform '{uniform}' for shader '{shader}' must be a vector of length {expected_length} (a flattened {lut_size}x{lut_size}x{lut_size} LUT), got length {actual_length}"
+    )]
+    InvalidLutData {
+        shader: String,
+        uniform: String,
+        lut_size: usize,
+        expected_length: usize,
+        actual_length: usize,
+    },
 }
 
 // scalars_b extends the original 4-float scalars slot for shaders that need
@@ -82,6 +104,27 @@ impl EffectPipeline {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
                             min_binding_size: None,
+                        },
+                        count: None,
+                    }],
+                });
+        let lut_bind_group_layout =
+            context
+                .device()
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("effects-lut-bind-group-layout"),
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            // No sampler is bound alongside this texture --
+                            // the shader reads it with textureLoad at exact
+                            // integer coordinates (nearest-neighbor LUT
+                            // lookup), not textureSample, so it doesn't need
+                            // to be filterable.
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
                         },
                         count: None,
                     }],
@@ -128,6 +171,13 @@ impl EffectPipeline {
                     label: Some("effects-luma-curve-shader"),
                     source: wgpu::ShaderSource::Wgsl(LUMA_CURVE_SHADER_SOURCE.into()),
                 });
+        let lut_3d_shader_module =
+            context
+                .device()
+                .create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("effects-lut-3d-shader"),
+                    source: wgpu::ShaderSource::Wgsl(LUT_3D_SHADER_SOURCE.into()),
+                });
         let pipeline_layout =
             context
                 .device()
@@ -136,6 +186,23 @@ impl EffectPipeline {
                     bind_group_layouts: &[
                         Some(context.texture_sampler_bind_group_layout()),
                         Some(&uniform_bind_group_layout),
+                    ],
+                    immediate_size: 0,
+                });
+        // A separate 3-bind-group layout for LUT-consuming shaders. wgpu
+        // pipelines bake their bind-group layouts in at creation time, so a
+        // shader needing a 3rd bind group (the LUT texture) can't reuse the
+        // shared 2-group `pipeline_layout` above -- it needs its own
+        // pipeline built against this layout.
+        let lut_pipeline_layout =
+            context
+                .device()
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("effects-lut-pipeline-layout"),
+                    bind_group_layouts: &[
+                        Some(context.texture_sampler_bind_group_layout()),
+                        Some(&uniform_bind_group_layout),
+                        Some(&lut_bind_group_layout),
                     ],
                     immediate_size: 0,
                 });
@@ -319,6 +386,42 @@ impl EffectPipeline {
                     multiview_mask: None,
                     cache: None,
                 });
+        let lut_3d_pipeline =
+            context
+                .device()
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("effects-lut-3d-pipeline"),
+                    layout: Some(&lut_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vertex_shader_module,
+                        entry_point: Some("vertex_main"),
+                        buffers: &[wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<[f32; 2]>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &[wgpu::VertexAttribute {
+                                format: wgpu::VertexFormat::Float32x2,
+                                offset: 0,
+                                shader_location: 0,
+                            }],
+                        }],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &lut_3d_shader_module,
+                        entry_point: Some("fragment_main"),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: context.texture_format(),
+                            blend: None,
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
         let pipelines = HashMap::from([
             (GAUSSIAN_BLUR_SHADER_ID.to_string(), gaussian_blur_pipeline),
             (
@@ -331,10 +434,12 @@ impl EffectPipeline {
                 hsl_qualifier_pipeline,
             ),
             (LUMA_CURVE_SHADER_ID.to_string(), luma_curve_pipeline),
+            (LUT_3D_SHADER_ID.to_string(), lut_3d_pipeline),
         ]);
 
         Self {
             uniform_bind_group_layout,
+            lut_bind_group_layout,
             pipelines,
         }
     }
@@ -430,6 +535,25 @@ impl EffectPipeline {
                 }
             })?;
 
+            let lut_bind_group = if pass.shader == LUT_3D_SHADER_ID {
+                let lut_texture = create_lut_texture(context, pass)?;
+                let lut_view = lut_texture.create_view(&wgpu::TextureViewDescriptor::default());
+                Some(
+                    context
+                        .device()
+                        .create_bind_group(&wgpu::BindGroupDescriptor {
+                            label: Some("effects-lut-bind-group"),
+                            layout: &self.lut_bind_group_layout,
+                            entries: &[wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(&lut_view),
+                            }],
+                        }),
+                )
+            } else {
+                None
+            };
+
             {
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("effects-render-pass"),
@@ -451,6 +575,9 @@ impl EffectPipeline {
                 render_pass.set_vertex_buffer(0, context.fullscreen_quad().slice(..));
                 render_pass.set_bind_group(0, &texture_bind_group, &[]);
                 render_pass.set_bind_group(1, &uniform_bind_group, &[]);
+                if let Some(lut_bind_group) = &lut_bind_group {
+                    render_pass.set_bind_group(2, lut_bind_group, &[]);
+                }
                 render_pass.draw(0..6, 0..1);
             }
 
@@ -473,6 +600,7 @@ fn pack_effect_uniforms(
         LOG_WHEELS_SHADER_ID => pack_log_wheels_uniforms(pass, width, height),
         HSL_QUALIFIER_SHADER_ID => pack_hsl_qualifier_uniforms(pass, width, height),
         LUMA_CURVE_SHADER_ID => pack_luma_curve_uniforms(pass, width, height),
+        LUT_3D_SHADER_ID => pack_lut_uniforms(pass, width, height),
         _ => Err(EffectsError::UnknownEffectShader {
             shader: shader.to_string(),
         }),
@@ -602,6 +730,118 @@ fn pack_luma_curve_uniforms(
         scalars: [y0, y1, y2, y3],
         scalars_b: [y4, 0.0, 0.0, 0.0],
     })
+}
+
+fn pack_lut_uniforms(
+    pass: &EffectPass,
+    width: u32,
+    height: u32,
+) -> Result<EffectUniformBuffer, EffectsError> {
+    let intensity = read_number_uniform(pass, "u_intensity")?;
+    // u_lut_data is consumed separately by create_lut_texture (it needs a
+    // real GPU texture, not a slot in the small fixed-size uniform buffer)
+    // but is still a legitimate, expected uniform for this shader.
+    reject_unexpected_uniforms(pass, &["u_intensity", "u_lut_data"])?;
+
+    Ok(EffectUniformBuffer {
+        resolution: [width as f32, height as f32],
+        direction: [0.0, 0.0],
+        scalars: [intensity, 0.0, 0.0, 0.0],
+        scalars_b: [0.0; 4],
+    })
+}
+
+/// Builds the tiled-2D GPU texture backing a 3D LUT lookup from a flattened
+/// RGB array. `u_lut_data` must have LUT_SIZE^3 * 3 floats, laid out in
+/// `.cube`-file order: red fastest-varying, then green, then blue --
+/// `data[((b * LUT_SIZE + g) * LUT_SIZE + r) * 3 + channel]`. The texture
+/// layout (LUT_SIZE tiles of LUT_SIZE x LUT_SIZE, one tile per blue slice,
+/// laid out along X) must match lut_3d.wgsl's texel-index math exactly --
+/// covered by lut.rs's pixel tests, not just "does it compile".
+fn create_lut_texture(
+    context: &GpuContext,
+    pass: &EffectPass,
+) -> Result<wgpu::Texture, EffectsError> {
+    let Some(value) = pass.uniforms.get("u_lut_data") else {
+        return Err(EffectsError::MissingUniform {
+            shader: pass.shader.clone(),
+            uniform: "u_lut_data".to_string(),
+        });
+    };
+    let UniformValue::Vector(data) = value else {
+        return Err(EffectsError::InvalidLutData {
+            shader: pass.shader.clone(),
+            uniform: "u_lut_data".to_string(),
+            lut_size: LUT_SIZE,
+            expected_length: LUT_DATA_LEN,
+            actual_length: 1,
+        });
+    };
+    if data.len() != LUT_DATA_LEN {
+        return Err(EffectsError::InvalidLutData {
+            shader: pass.shader.clone(),
+            uniform: "u_lut_data".to_string(),
+            lut_size: LUT_SIZE,
+            expected_length: LUT_DATA_LEN,
+            actual_length: data.len(),
+        });
+    }
+
+    let width = (LUT_SIZE * LUT_SIZE) as u32;
+    let height = LUT_SIZE as u32;
+    let mut bytes = vec![0u8; (width * height * 4) as usize];
+    for g in 0..LUT_SIZE {
+        for column in 0..(LUT_SIZE * LUT_SIZE) {
+            let b = column / LUT_SIZE;
+            let r = column % LUT_SIZE;
+            let data_index = ((b * LUT_SIZE + g) * LUT_SIZE + r) * 3;
+            let texel_index = (g * (LUT_SIZE * LUT_SIZE) + column) * 4;
+            bytes[texel_index] = to_unorm_byte(data[data_index]);
+            bytes[texel_index + 1] = to_unorm_byte(data[data_index + 1]);
+            bytes[texel_index + 2] = to_unorm_byte(data[data_index + 2]);
+            bytes[texel_index + 3] = 255;
+        }
+    }
+
+    let texture = context.device().create_texture(&wgpu::TextureDescriptor {
+        label: Some("effects-lut-texture"),
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    context.queue().write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        &bytes,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(width * 4),
+            rows_per_image: Some(height),
+        },
+        wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+    );
+
+    Ok(texture)
+}
+
+fn to_unorm_byte(value: f32) -> u8 {
+    (value.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
 fn read_number_uniform(pass: &EffectPass, uniform: &str) -> Result<f32, EffectsError> {
