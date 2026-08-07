@@ -13,6 +13,8 @@ const PRIMARY_WHEELS_SHADER_ID: &str = "primary-wheels";
 const PRIMARY_WHEELS_SHADER_SOURCE: &str = include_str!("shaders/primary_wheels.wgsl");
 const LOG_WHEELS_SHADER_ID: &str = "log-wheels";
 const LOG_WHEELS_SHADER_SOURCE: &str = include_str!("shaders/log_wheels.wgsl");
+const HSL_QUALIFIER_SHADER_ID: &str = "hsl-qualifier";
+const HSL_QUALIFIER_SHADER_SOURCE: &str = include_str!("shaders/hsl_qualifier.wgsl");
 
 pub struct ApplyEffectsOptions<'a> {
     pub source: &'a wgpu::Texture,
@@ -48,12 +50,20 @@ pub enum EffectsError {
     UnsupportedUniform { shader: String, uniform: String },
 }
 
+// scalars_b extends the original 4-float scalars slot for shaders that need
+// more than 4 free values (e.g. hsl-qualifier's 7 params). Appended at the
+// end so it's backward-compatible: WGSL uniform-buffer bindings only read
+// the bytes their own struct declares, so shaders that don't know about
+// scalars_b (gaussian-blur, primary-wheels, log-wheels) are unaffected --
+// verified by re-running their existing tests after this change, not
+// assumed safe from the WGSL spec alone.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct EffectUniformBuffer {
     resolution: [f32; 2],
     direction: [f32; 2],
     scalars: [f32; 4],
+    scalars_b: [f32; 4],
 }
 
 impl EffectPipeline {
@@ -101,6 +111,13 @@ impl EffectPipeline {
                 .create_shader_module(wgpu::ShaderModuleDescriptor {
                     label: Some("effects-log-wheels-shader"),
                     source: wgpu::ShaderSource::Wgsl(LOG_WHEELS_SHADER_SOURCE.into()),
+                });
+        let hsl_qualifier_shader_module =
+            context
+                .device()
+                .create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("effects-hsl-qualifier-shader"),
+                    source: wgpu::ShaderSource::Wgsl(HSL_QUALIFIER_SHADER_SOURCE.into()),
                 });
         let pipeline_layout =
             context
@@ -221,6 +238,42 @@ impl EffectPipeline {
                     multiview_mask: None,
                     cache: None,
                 });
+        let hsl_qualifier_pipeline =
+            context
+                .device()
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("effects-hsl-qualifier-pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &vertex_shader_module,
+                        entry_point: Some("vertex_main"),
+                        buffers: &[wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<[f32; 2]>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &[wgpu::VertexAttribute {
+                                format: wgpu::VertexFormat::Float32x2,
+                                offset: 0,
+                                shader_location: 0,
+                            }],
+                        }],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &hsl_qualifier_shader_module,
+                        entry_point: Some("fragment_main"),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: context.texture_format(),
+                            blend: None,
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
         let pipelines = HashMap::from([
             (GAUSSIAN_BLUR_SHADER_ID.to_string(), gaussian_blur_pipeline),
             (
@@ -228,6 +281,10 @@ impl EffectPipeline {
                 primary_wheels_pipeline,
             ),
             (LOG_WHEELS_SHADER_ID.to_string(), log_wheels_pipeline),
+            (
+                HSL_QUALIFIER_SHADER_ID.to_string(),
+                hsl_qualifier_pipeline,
+            ),
         ]);
 
         Self {
@@ -368,6 +425,7 @@ fn pack_effect_uniforms(
         GAUSSIAN_BLUR_SHADER_ID => pack_gaussian_blur_uniforms(pass, width, height),
         PRIMARY_WHEELS_SHADER_ID => pack_primary_wheels_uniforms(pass, width, height),
         LOG_WHEELS_SHADER_ID => pack_log_wheels_uniforms(pass, width, height),
+        HSL_QUALIFIER_SHADER_ID => pack_hsl_qualifier_uniforms(pass, width, height),
         _ => Err(EffectsError::UnknownEffectShader {
             shader: shader.to_string(),
         }),
@@ -404,6 +462,7 @@ fn pack_gaussian_blur_uniforms(
         resolution: [width as f32, height as f32],
         direction,
         scalars: [sigma, step, 0.0, 0.0],
+        scalars_b: [0.0; 4],
     })
 }
 
@@ -422,6 +481,7 @@ fn pack_primary_wheels_uniforms(
         resolution: [width as f32, height as f32],
         direction: [0.0, 0.0],
         scalars: [lift, gamma, gain, offset],
+        scalars_b: [0.0; 4],
     })
 }
 
@@ -440,6 +500,40 @@ fn pack_log_wheels_uniforms(
         resolution: [width as f32, height as f32],
         direction: [0.0, 0.0],
         scalars: [lift, gamma_offset, gain, offset],
+        scalars_b: [0.0; 4],
+    })
+}
+
+fn pack_hsl_qualifier_uniforms(
+    pass: &EffectPass,
+    width: u32,
+    height: u32,
+) -> Result<EffectUniformBuffer, EffectsError> {
+    let hue_center = read_number_uniform(pass, "u_hue_center")?;
+    let hue_width = read_number_uniform(pass, "u_hue_width")?;
+    let sat_center = read_number_uniform(pass, "u_sat_center")?;
+    let sat_width = read_number_uniform(pass, "u_sat_width")?;
+    let lum_center = read_number_uniform(pass, "u_lum_center")?;
+    let lum_width = read_number_uniform(pass, "u_lum_width")?;
+    let softness = read_number_uniform(pass, "u_softness")?;
+    reject_unexpected_uniforms(
+        pass,
+        &[
+            "u_hue_center",
+            "u_hue_width",
+            "u_sat_center",
+            "u_sat_width",
+            "u_lum_center",
+            "u_lum_width",
+            "u_softness",
+        ],
+    )?;
+
+    Ok(EffectUniformBuffer {
+        resolution: [width as f32, height as f32],
+        direction: [0.0, 0.0],
+        scalars: [hue_center, hue_width, sat_center, sat_width],
+        scalars_b: [lum_center, lum_width, softness, 0.0],
     })
 }
 
