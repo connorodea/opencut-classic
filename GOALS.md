@@ -228,9 +228,9 @@ always included "basic RAW exposure/WB/temp-tint controls," but 4a's gap-map and
 clause both missed it; see `COLOR_GRADING_DESIGN.md` gap-map item 9 for the correction.)_
 
 **Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels, log wheels,
-HSL qualifier, luma curve, rgb curves, LUT import/apply, the serial node graph, exposure
-+ white-balance, and all four scopes' core computations (histogram/waveform/vectorscope/
-parade) closed. Scopes' Action/UI
+HSL qualifier, luma qualifier, luma curve, rgb curves, LUT import/apply, the serial node
+graph, exposure + white-balance, and all four scopes' core computations
+(histogram/waveform/vectorscope/parade) closed. Scopes' Action/UI
 wiring in progress: WASM bindings (`rust/wasm/src/scopes.rs`, committed) and a TS
 service layer (`@/services/color-scope/service.ts`, written + verified via local link,
 not yet committed) are done, both real-verified through the actual JS/WASM bridge —
@@ -393,6 +393,20 @@ release once one override happens.
   here isn't curve correctness (already proven) — it's that changing only red's curve
   leaves green/blue provably untouched on native GPU, plus all three channels
   independently matching their own reference with genuinely different deltas.
+  **Luma qualifier done 2026-08-06 — a third gap-map correction, closed via reuse
+  rather than new GPU work.** "HSL/RGB/luma qualifiers" — HSL built, RGB explicitly
+  deferred with reasoning, but luma qualifier never mentioned as either. Reading
+  `hsl_qualifier.wgsl`'s own math shows `hue_width=1.0`/`sat_width=1.0` make its
+  hue/saturation gates pass unconditionally (both equal `width*0.5` at the widest
+  possible distance exactly when width=1.0) — `hsl-qualifier` already gives luma-only
+  qualification as a special case. Same move as gap-map item 6 (serial node graph):
+  verified the reuse claim on real pixels (matching luma passes full-color regardless
+  of hue; two very different hues at the same luma get pixel-identical treatment) rather
+  than trusting the derived math, then shipped a thin `"luma-qualifier"` `EffectDefinition`
+  (3 focused params) rendering against `hsl-qualifier`'s existing shader with the hue/sat
+  gates hardcoded open — zero new Rust/GPU code. Systematically re-checked
+  `DAVINCI_PARITY.md`'s full Phase 1 "In scope" line against everything shipped after
+  this; no further gaps found.
 
 **Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
 `DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via

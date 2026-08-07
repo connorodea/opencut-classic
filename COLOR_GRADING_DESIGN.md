@@ -320,6 +320,38 @@ Ranked by how much new Rust work each needs, cheapest first:
     luma-curve bug's own failure class). TS side: 15 number params, headless proof sets
     15 genuinely distinct values (not one repeated) so a channel-collapsing bug at the
     Action/state layer would show up there too, not just in the shader.
+11. **Luma qualifier — a third gap-map correction, closed 2026-08-06 via reuse, not new
+    GPU work.** `GOALS.md`'s Done-when clause says "HSL/RGB/luma qualifiers" — HSL was
+    built, RGB was explicitly deferred with reasoning in item 3's own closure note, but
+    luma qualifier was never mentioned as either built or deferred anywhere. Found the
+    same way as items 9-10: still blocked on the scopes npm-publish step, systematically
+    checking Phase 1's original scope against what actually shipped rather than assuming
+    "done" once the obvious items were closed.
+
+    Unlike 9 and 10, this needed **zero new Rust code**. Reading `hsl_qualifier.wgsl`'s
+    own `hue_membership`/`range_membership` formulas shows `hue_width=1.0` and
+    `sat_width=1.0` make both return 1.0 unconditionally — the widest possible circular
+    hue distance (0.5) and the full 0..1 saturation range both equal `width * 0.5`
+    exactly at `width=1.0`, so `dist <= inner` always holds and `smoothstep` never
+    triggers. `hsl-qualifier` already provides luma-only qualification as a special case.
+    Same shape as gap-map item 6 (serial node graph): don't duplicate a shader, verify
+    the reuse claim on real pixels rather than trust the derived math alone, and close
+    the gap with a test + a thin TS convenience layer instead of new GPU work.
+    `rust/crates/effects/tests/luma_qualifier_equivalence.rs` verifies on native GPU:
+    matching luma passes through full-color regardless of hue (pure red/green/blue at
+    the same HSL lightness all pass identically), non-matching luma dims regardless of
+    hue, and two very different hues at the same luma get pixel-identical treatment.
+    TS side: a `"luma-qualifier"` `EffectDefinition` (3 focused params) rendering passes
+    against `hsl-qualifier`'s existing shader ID with the hue/sat gates hardcoded open —
+    the discoverable surface for the common case, while the full hue/sat/lum control set
+    stays directly available via `"hsl-qualifier"`. Verified via the standard headless
+    state-persistence proof.
+
+    **Believed closed now** — the systematic re-check against `DAVINCI_PARITY.md`'s
+    Phase 1 "In scope" line (primary+log wheels, RGB/luma curves, HSL/RGB/luma
+    qualifiers, serial+parallel node graph, LUT import/apply, exposure/WB/tint, four
+    scopes) that surfaced items 9-11 has now been run item-by-item against everything
+    that's shipped; no further gaps found as of this pass.
 
 ## What 4b should NOT assume
 
