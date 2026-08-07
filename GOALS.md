@@ -246,10 +246,20 @@ MIT `LICENSE` copied into `rust/wasm/` (wasm-pack was warning none existed), the
 upstream-branded `rust/wasm/README.md` corrected to this fork's package name/repo (same
 misleading-metadata class already fixed in `Cargo.toml`), and `--scope connorodea` baked
 into `build:wasm`/`dev:wasm` in `package.json` so the pre-existing `publish:wasm` script
-now produces the correctly-scoped package by default. The moment auth completes:
-`bun run publish:wasm`, repin `apps/web/package.json`, update ~29 import sites from
-`"opencut-wasm"` to `"@connorodea/opencut-wasm"`, `bun install`, re-verify tsc/tests,
-commit the already-written service.ts + 2 headless proof scripts. Not blocking: a visual
+now produces the correctly-scoped package by default. **`npm login` completed 2026-08-06**
+(`npm whoami` now returns `connorodea`) — but `npm publish` turned out to need its own
+separate one-time-password confirmation, whose auth URL npm deliberately redacts outside
+a real interactive terminal, so that step is handed to the user the same way login was.
+**`scripts/repin-opencut-wasm.sh` written and `--dry-run` verified 2026-08-06** — the
+post-publish repin (rewrite ~30 `"opencut-wasm"` imports to `"@connorodea/opencut-wasm"`,
+update `apps/web/package.json`, `bun install`, re-verify tsc/tests) is now a single
+command instead of a re-derived file list. The dry run caught a real bug before it did
+anything: the rewrite `sed` used `/` as its delimiter, but `@connorodea/opencut-wasm`
+also contains `/`, so `sed` misparsed the command and would have produced empty output
+(silently deleting every rewritten file's contents) — fixed by switching to `|` as the
+delimiter, re-verified clean. The moment `npm publish` clears its OTP step: `./scripts/
+repin-opencut-wasm.sh` (no dry-run flag), review the diff, commit alongside the
+already-written service.ts + 2 headless proof scripts. Not blocking: a visual
 scope-panel UI component (displaying the data graphically) is a separate, larger,
 not-yet-started stretch beyond what "Done when" strictly requires — Goal 4's framing is
 "documented, agent-drivable Action surface," and `computeFrameScope`/
