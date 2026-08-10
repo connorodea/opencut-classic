@@ -11,11 +11,15 @@
  * `getTextMeasurementContext()`'s existing `typeof OffscreenCanvas !==
  * "undefined"` branch picks it up with zero application-code changes.
  */
-import { createCanvas } from "@napi-rs/canvas";
+import { type Canvas, createCanvas } from "@napi-rs/canvas";
 
 if (typeof globalThis.OffscreenCanvas === "undefined") {
 	class OffscreenCanvasPolyfill {
-		private readonly canvas: ReturnType<typeof createCanvas>;
+		// `createCanvas` is overloaded (2-arg -> Canvas, 3-arg with an SVG
+		// flag -> SvgCanvas); `ReturnType<typeof createCanvas>` resolves to
+		// the *last* overload (SvgCanvas), which doesn't match the 2-arg
+		// call below -- pin the type explicitly instead.
+		private readonly canvas: Canvas;
 
 		constructor(width: number, height: number) {
 			this.canvas = createCanvas(width, height);
