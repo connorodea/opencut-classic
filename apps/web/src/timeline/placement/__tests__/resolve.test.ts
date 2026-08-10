@@ -574,9 +574,17 @@ describe("resolveTrackPlacement", () => {
 			resolveTrackPlacement({
 				tracks,
 				elementType: "audio",
+				// startTime/duration are raw MediaTime ticks in this file's
+				// convention (see buildElement/buildTimeSpan above), which
+				// requires integers -- these were previously fractional
+				// (2.5/5.5), which mediaTime() correctly rejects. Neither
+				// original value's *fractional* part mattered to the test's
+				// intent (span 1 not overlapping "a"/"b", span 2 overlapping
+				// "b"=[5,7)); rounded to the nearest integers that preserve
+				// that same overlap/non-overlap relationship.
 				timeSpans: [
-					buildTimeSpan({ startTime: 2.5, duration: 1 }),
-					buildTimeSpan({ startTime: 5.5, duration: 1 }),
+					buildTimeSpan({ startTime: 3, duration: 1 }),
+					buildTimeSpan({ startTime: 6, duration: 1 }),
 				],
 				strategy: { type: "firstAvailable" },
 			}),

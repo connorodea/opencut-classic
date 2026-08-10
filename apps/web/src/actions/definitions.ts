@@ -426,6 +426,31 @@ export const ACTIONS = {
 
 export type TAction = keyof typeof ACTIONS;
 
+const ACTION_NAMES: ReadonlySet<string> = new Set(Object.keys(ACTIONS));
+
+/**
+ * Validates a persisted/imported string as a real, registered action name.
+ *
+ * Named/typed against `TActionWithOptionalArgs` (actions safely invocable
+ * with no args payload -- which is all a keybinding can ever carry, since
+ * `PersistedKeybindingsState` stores `{key: actionName}` with no args
+ * slot), but this runtime check only enforces "is a known action" --
+ * `ACTIONS` doesn't currently carry a runtime-checkable required-vs-
+ * optional-args distinction (that split lives only in `TActionArgsMap`'s
+ * hand-written `| undefined` unions, e.g. `"seek-forward": { seconds:
+ * number } | undefined`). A handful of registered actions do treat a
+ * missing-args call as an error rather than a safe default; this guard
+ * does not currently filter those out. Stated limitation, not a silent
+ * gap -- tightening it would mean deriving TActionWithOptionalArgs'
+ * member set at runtime, which needs ACTIONS itself to carry that
+ * information, not just arg *shapes*.
+ */
+export function isActionWithOptionalArgs(
+	value: string,
+): value is TActionWithOptionalArgs {
+	return ACTION_NAMES.has(value);
+}
+
 const ACTION_DEFAULT_SHORTCUTS = [
 	["toggle-play", ["space", "k"]],
 	["seek-forward", ["l"]],

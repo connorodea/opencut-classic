@@ -357,7 +357,19 @@ describe("mask snapping", () => {
 		});
 
 		expect(result.params.scale).toBe(2.5);
-		expect(result.activeLines).toEqual([{ type: "vertical", position: 100 }]);
+		// A uniform-scale handle scales symmetrically around center, so the
+		// mirrored left edge (-100) also lands exactly on its own vertical
+		// target as a side effect of the same scale that snapped the right
+		// edge to 100 -- snapScale() in preview-snap.ts checks all targets
+		// against the final snapped bounds, not just the edge that
+		// triggered the match, so both genuinely-aligned lines are
+		// reported. Previously asserted only the right-edge line; traced
+		// against snapScale()'s actual (correct) behavior and updated,
+		// not a logic change.
+		expect(result.activeLines).toEqual([
+			{ type: "vertical", position: -100 },
+			{ type: "vertical", position: 100 },
+		]);
 	});
 
 	test("snaps text mask movement using intrinsic text bounds", () => {
@@ -495,13 +507,23 @@ describe("custom mask point insertion", () => {
 		});
 
 		expect(nextPoints.map((point) => point.id)).toEqual(["a", "new", "b", "c"]);
+		// De Casteljau subdivision of segment a->b (a straight line: both
+		// endpoints have zero in/out handles) does not preserve "zero
+		// handles" as a canonical form at the split point -- it preserves
+		// the curve's actual shape. Hand-verified: (splitPoint.x + inX,
+		// splitPoint.y + inY) = (-0.1, -0.1) and (splitPoint.x + outX,
+		// splitPoint.y + outY) = (0.1, -0.1) are both exactly collinear
+		// with a=(-0.2,-0.1) and b=(0.2,-0.1) (all share y=-0.1), so both
+		// resulting sub-segments render as perfectly straight lines --
+		// the algorithm is correct; the previous zero-handle expectation
+		// assumed a canonical form the math doesn't produce.
 		expect(nextPoints[1]).toMatchObject({
 			id: "new",
 			x: 0,
 			y: -0.1,
-			inX: 0,
+			inX: -0.1,
 			inY: 0,
-			outX: 0,
+			outX: 0.1,
 			outY: 0,
 		});
 	});
