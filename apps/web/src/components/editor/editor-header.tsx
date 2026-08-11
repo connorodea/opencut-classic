@@ -137,17 +137,23 @@ function ProjectDropdown() {
 						Shortcuts
 					</DropdownMenuItem>
 
-					<DropdownMenuSeparator />
-
-					<DropdownMenuItem asChild icon={<FaDiscord className="size-4!" />}>
-						<Link
-							href={SOCIAL_LINKS.discord}
-							target="_blank"
-							rel="noopener noreferrer"
-						>
-							Discord
-						</Link>
-					</DropdownMenuItem>
+					{SOCIAL_LINKS.discord && (
+						<>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem
+								asChild
+								icon={<FaDiscord className="size-4!" />}
+							>
+								<Link
+									href={SOCIAL_LINKS.discord}
+									target="_blank"
+									rel="noopener noreferrer"
+								>
+									Discord
+								</Link>
+							</DropdownMenuItem>
+						</>
+					)}
 				</DropdownMenuContent>
 			</DropdownMenu>
 			<RenameProjectDialog
