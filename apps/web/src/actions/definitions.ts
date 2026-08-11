@@ -9,7 +9,13 @@ export type TActionCategory =
 	| "history"
 	| "timeline"
 	| "controls"
-	| "assets";
+	| "assets"
+	| "project"
+	| "effects"
+	| "keyframes"
+	| "masks"
+	| "scenes"
+	| "tracks";
 
 export interface TActionBaseDefinition {
 	description: string;
@@ -148,9 +154,302 @@ export const ACTIONS = {
 		category: "assets",
 		args: { projectId: "string", assetIds: "string[]" },
 	},
+	"add-media-asset": {
+		description:
+			"Add a media asset (already-processed: name/type/file and optional dimensions/duration/fps) to a project",
+		category: "assets",
+		args: { projectId: "string", asset: "object" },
+	},
+	"export-project": {
+		description: "Render and export the active project to a video file",
+		category: "project",
+		args: {
+			format: "string",
+			quality: "string",
+			fps: "number",
+			includeAudio: "boolean",
+		},
+	},
+	"create-project": {
+		description: "Create a new project and make it active",
+		category: "project",
+		args: { name: "string" },
+	},
+	"load-project": {
+		description: "Load an existing project by id and make it active",
+		category: "project",
+		args: { id: "string" },
+	},
+	"save-project": {
+		description: "Save the active project",
+		category: "project",
+	},
+	"update-project-settings": {
+		description: "Update the active project's settings (fps, canvas size, background, etc.)",
+		category: "project",
+		args: { settings: "object" },
+	},
+	"add-clip-effect": {
+		description: "Add an effect to a clip",
+		category: "effects",
+		args: { trackId: "string", elementId: "string", effectType: "string" },
+	},
+	"remove-clip-effect": {
+		description: "Remove an effect from a clip",
+		category: "effects",
+		args: { trackId: "string", elementId: "string", effectId: "string" },
+	},
+	"toggle-clip-effect": {
+		description: "Enable/disable an effect on a clip",
+		category: "effects",
+		args: { trackId: "string", elementId: "string", effectId: "string" },
+	},
+	"reorder-clip-effects": {
+		description: "Change the order of an effect in a clip's effect stack",
+		category: "effects",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			fromIndex: "number",
+			toIndex: "number",
+		},
+	},
+	"update-clip-effect-params": {
+		description: "Update an effect's parameter values on a clip",
+		category: "effects",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			effectId: "string",
+			params: "object",
+		},
+	},
+	"upsert-keyframe": {
+		description: "Create or update a keyframe on an animated element property",
+		category: "keyframes",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			propertyPath: "string",
+			time: "number",
+			value: "unknown",
+			interpolation: "string",
+			keyframeId: "string",
+		},
+	},
+	"retime-keyframe": {
+		description: "Move a keyframe to a new time",
+		category: "keyframes",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			propertyPath: "string",
+			keyframeId: "string",
+			time: "number",
+		},
+	},
+	"update-keyframe-curve": {
+		description: "Update a keyframe's easing/curve on a scalar animated property",
+		category: "keyframes",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			propertyPath: "string",
+			componentKey: "string",
+			keyframeId: "string",
+			patch: "object",
+		},
+	},
+	"upsert-effect-param-keyframe": {
+		description: "Create or update a keyframe on an effect's parameter",
+		category: "keyframes",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			effectId: "string",
+			paramKey: "string",
+			time: "number",
+			value: "number",
+			interpolation: "string",
+			keyframeId: "string",
+		},
+	},
+	"remove-effect-param-keyframe": {
+		description: "Remove a keyframe from an effect's parameter",
+		category: "keyframes",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			effectId: "string",
+			paramKey: "string",
+			keyframeId: "string",
+		},
+	},
+	"remove-mask": {
+		description: "Remove a mask from a clip",
+		category: "masks",
+		args: { trackId: "string", elementId: "string", maskId: "string" },
+	},
+	"toggle-mask-inverted": {
+		description: "Invert/uninvert a clip's mask",
+		category: "masks",
+		args: { trackId: "string", elementId: "string", maskId: "string" },
+	},
+	"insert-freeform-path-mask-point": {
+		description: "Insert a point into a clip's freeform-path mask",
+		category: "masks",
+		args: {
+			trackId: "string",
+			elementId: "string",
+			maskId: "string",
+			segmentIndex: "number",
+			canvasPoint: "object",
+			bounds: "object",
+		},
+	},
+	"create-scene": {
+		description: "Create a new scene in the active project",
+		category: "scenes",
+		args: { name: "string", isMain: "boolean" },
+	},
+	"delete-scene": {
+		description: "Delete a scene from the active project",
+		category: "scenes",
+		args: { sceneId: "string" },
+	},
+	"rename-scene": {
+		description: "Rename a scene",
+		category: "scenes",
+		args: { sceneId: "string", name: "string" },
+	},
+	"switch-scene": {
+		description: "Make a scene the active scene",
+		category: "scenes",
+		args: { sceneId: "string" },
+	},
+	"remove-bookmark": {
+		description: "Remove a bookmark at a given time",
+		category: "timeline",
+		args: { time: "number" },
+	},
+	"update-bookmark": {
+		description: "Update a bookmark's fields (e.g. label) at a given time",
+		category: "timeline",
+		args: { time: "number", updates: "object" },
+	},
+	"move-bookmark": {
+		description: "Move a bookmark from one time to another",
+		category: "timeline",
+		args: { fromTime: "number", toTime: "number" },
+	},
+	"add-track": {
+		description: "Add a new track to the timeline",
+		category: "tracks",
+		args: { type: "string", index: "number" },
+	},
+	"remove-track": {
+		description: "Remove a track from the timeline",
+		category: "tracks",
+		args: { trackId: "string" },
+	},
+	"toggle-track-mute": {
+		description: "Mute/unmute a track",
+		category: "tracks",
+		args: { trackId: "string" },
+	},
+	"toggle-track-visibility": {
+		description: "Show/hide a track",
+		category: "tracks",
+		args: { trackId: "string" },
+	},
+	"rename-project": {
+		description: "Rename a saved project",
+		category: "project",
+		args: { id: "string", name: "string" },
+	},
+	"duplicate-projects": {
+		description: "Duplicate one or more saved projects",
+		category: "project",
+		args: { ids: "string[]" },
+	},
+	"delete-projects": {
+		description: "Delete one or more saved projects",
+		category: "project",
+		args: { ids: "string[]" },
+	},
+	"update-project-thumbnail": {
+		description: "Update the active project's thumbnail",
+		category: "project",
+		args: { thumbnail: "string" },
+	},
+	"close-project": {
+		description: "Close the active project without deleting it",
+		category: "project",
+	},
+	"insert-element": {
+		description: "Insert a new element onto the timeline",
+		category: "editing",
+		args: { element: "object", placement: "object" },
+	},
+	"update-element-trim": {
+		description: "Trim a clip's in/out point",
+		category: "editing",
+		args: {
+			elementId: "string",
+			trimStart: "number",
+			trimEnd: "number",
+			startTime: "number",
+			duration: "number",
+		},
+	},
+	"update-element-retime": {
+		description: "Change a clip's playback speed/retiming",
+		category: "editing",
+		args: { trackId: "string", elementId: "string", retime: "object" },
+	},
+	"move-elements": {
+		description: "Move one or more elements to a new track/time",
+		category: "editing",
+		args: { moves: "object[]", createTracks: "object[]" },
+	},
+	"update-elements": {
+		description: "Batch-update properties on one or more elements",
+		category: "editing",
+		args: { updates: "object[]" },
+	},
+	"insert-captions-as-text-track": {
+		description: "Insert a list of caption cues as a new text track",
+		category: "editing",
+		args: { captions: "object[]" },
+	},
 } as const satisfies Record<string, TActionBaseDefinition>;
 
 export type TAction = keyof typeof ACTIONS;
+
+const ACTION_NAMES: ReadonlySet<string> = new Set(Object.keys(ACTIONS));
+
+/**
+ * Validates a persisted/imported string as a real, registered action name.
+ *
+ * Named/typed against `TActionWithOptionalArgs` (actions safely invocable
+ * with no args payload -- which is all a keybinding can ever carry, since
+ * `PersistedKeybindingsState` stores `{key: actionName}` with no args
+ * slot), but this runtime check only enforces "is a known action" --
+ * `ACTIONS` doesn't currently carry a runtime-checkable required-vs-
+ * optional-args distinction (that split lives only in `TActionArgsMap`'s
+ * hand-written `| undefined` unions, e.g. `"seek-forward": { seconds:
+ * number } | undefined`). A handful of registered actions do treat a
+ * missing-args call as an error rather than a safe default; this guard
+ * does not currently filter those out. Stated limitation, not a silent
+ * gap -- tightening it would mean deriving TActionWithOptionalArgs'
+ * member set at runtime, which needs ACTIONS itself to carry that
+ * information, not just arg *shapes*.
+ */
+export function isActionWithOptionalArgs(
+	value: string,
+): value is TActionWithOptionalArgs {
+	return ACTION_NAMES.has(value);
+}
 
 const ACTION_DEFAULT_SHORTCUTS = [
 	["toggle-play", ["space", "k"]],

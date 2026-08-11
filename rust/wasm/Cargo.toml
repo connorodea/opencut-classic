@@ -1,9 +1,9 @@
 [package]
 name = "opencut-wasm"
-version = "0.2.10"
+version = "0.3.0"
 edition = "2024"
-description = "Shared video editor logic compiled to WebAssembly"
-repository = "https://github.com/opencut/opencut"
+description = "Shared video editor logic compiled to WebAssembly (connorodea/opencut-classic fork)"
+repository = "https://github.com/connorodea/opencut-classic"
 license = "MIT"
 
 [lib]

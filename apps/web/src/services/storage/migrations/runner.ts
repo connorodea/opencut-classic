@@ -2,6 +2,9 @@ import {
 	IndexedDBAdapter,
 	deleteDatabase,
 } from "@/services/storage/indexeddb-adapter";
+import { FileSystemAdapter } from "@/services/storage/filesystem-adapter";
+import { isBrowserStorageAvailable } from "@/services/storage/headless-paths";
+import type { StorageAdapter } from "@/services/storage/types";
 import type { StorageMigration } from "./base";
 import type { ProjectRecord } from "./transformers/types";
 import { getProjectId, isRecord } from "./transformers/utils";
@@ -29,7 +32,7 @@ export async function runStorageMigrations({
 	onProgress?: (progress: MigrationProgress) => void;
 }): Promise<StorageMigrationResult> {
 	// One-time cleanup: delete the old global version database
-	if (!hasCleanedUpMetaDb) {
+	if (!hasCleanedUpMetaDb && isBrowserStorageAvailable()) {
 		try {
 			await deleteDatabase({ dbName: "video-editor-meta" });
 		} catch {
@@ -38,11 +41,15 @@ export async function runStorageMigrations({
 		hasCleanedUpMetaDb = true;
 	}
 
-	const projectsAdapter = new IndexedDBAdapter<ProjectRecord>(
-		"video-editor-projects",
-		"projects",
-		1,
-	);
+	const projectsAdapter: StorageAdapter<ProjectRecord> & {
+		getAll(): Promise<ProjectRecord[]>;
+	} = isBrowserStorageAvailable()
+		? new IndexedDBAdapter<ProjectRecord>({
+				dbName: "video-editor-projects",
+				storeName: "projects",
+				version: 1,
+			})
+		: new FileSystemAdapter<ProjectRecord>("projects");
 
 	const projects = await projectsAdapter.getAll();
 
@@ -95,7 +102,7 @@ export async function runStorageMigrations({
 				break;
 			}
 
-			await projectsAdapter.set(projectId, result.project);
+			await projectsAdapter.set({ key: projectId, value: result.project });
 			migratedCount++;
 			currentVersion = migration.to;
 			projectRecord = result.project;

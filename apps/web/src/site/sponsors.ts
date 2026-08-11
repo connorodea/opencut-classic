@@ -6,19 +6,7 @@ export type Sponsor = {
 	invertOnDark?: boolean;
 };
 
-export const SPONSORS: Sponsor[] = [
-	{
-		name: "Fal.ai",
-		url: "https://fal.ai?utm_source=opencut",
-		logo: "/logos/others/fal.svg",
-		description: "Generative image, video, and audio models all in one place.",
-		invertOnDark: true,
-	},
-	{
-		name: "Vercel",
-		url: "https://vercel.com?utm_source=opencut",
-		logo: "/logos/others/vercel.svg",
-		description: "Platform where we deploy and host OpenCut.",
-		invertOnDark: true,
-	},
-];
+// Fal.ai/Vercel were the upstream OpenCut project's real sponsors, not
+// ours -- don't carry over sponsorship claims that aren't true for this
+// fork. Empty until FilmFusion has real sponsors of its own.
+export const SPONSORS: Sponsor[] = [];

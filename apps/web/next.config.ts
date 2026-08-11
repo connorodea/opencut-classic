@@ -9,6 +9,21 @@ const nextConfig: NextConfig = {
 	reactStrictMode: true,
 	productionBrowserSourceMaps: true,
 	output: "standalone",
+	turbopack: {
+		resolveAlias: {
+			// filesystem-adapter.ts / filesystem-blob-adapter.ts (the headless
+			// runner's node:fs-backed storage adapters, see HEADLESS_DESIGN.md)
+			// are statically reachable from the real "use client" editor page
+			// via storage/service.ts, so Turbopack compiles them for the browser
+			// bundle too -- bare `node:fs` has no browser target and fails that
+			// compile outright, even though the branch that needs it is never
+			// reached at runtime in an actual browser. See
+			// src/services/storage/browser-node-fs-shim.ts for details.
+			"node:fs": {
+				browser: "./src/services/storage/browser-node-fs-shim.ts",
+			},
+		},
+	},
 	images: {
 		remotePatterns: [
 			{

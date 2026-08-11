@@ -1,0 +1,5 @@
+[
+	{ "action": "update-project-settings", "args": { "settings": { "fps": { "numerator": 25, "denominator": 1 } } } },
+	{ "action": "add-track", "args": { "type": "video" } },
+	{ "action": "save-project" }
+]

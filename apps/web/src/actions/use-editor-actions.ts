@@ -26,6 +26,7 @@ import {
 	type ScopeEntry,
 } from "@/selection/scope";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
+import * as handlers from "@/actions/handlers";
 
 export function useEditorActions() {
 	const editor = useEditor();
@@ -514,6 +515,379 @@ export function useEditorActions() {
 				projectId: args.projectId,
 				ids: args.assetIds,
 			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"add-media-asset",
+		(args) => {
+			if (!args) return;
+			handlers.addMediaAsset(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"export-project",
+		(args) => {
+			if (!args) return;
+			// Fire-and-forget: progress/result are observed via
+			// editor.project.getExportState(), same as the export UI does —
+			// keeps this handler's signature consistent with every other
+			// action handler (void, not a returned Promise).
+			handlers.exportProject(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"create-project",
+		(args) => {
+			if (!args) return;
+			// Fire-and-forget, like export-project: the new project's id/state
+			// is observed via editor.project.getActive() after this resolves.
+			handlers.createProject(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"load-project",
+		(args) => {
+			if (!args) return;
+			handlers.loadProject(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"save-project",
+		() => {
+			handlers.saveProject(editor);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-project-settings",
+		(args) => {
+			if (!args) return;
+			handlers.updateProjectSettings(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"add-clip-effect",
+		(args) => {
+			if (!args) return;
+			handlers.addClipEffect(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"remove-clip-effect",
+		(args) => {
+			if (!args) return;
+			handlers.removeClipEffect(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"toggle-clip-effect",
+		(args) => {
+			if (!args) return;
+			handlers.toggleClipEffect(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"reorder-clip-effects",
+		(args) => {
+			if (!args) return;
+			handlers.reorderClipEffects(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-clip-effect-params",
+		(args) => {
+			if (!args) return;
+			handlers.updateClipEffectParams(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"upsert-keyframe",
+		(args) => {
+			if (!args) return;
+			handlers.upsertKeyframe(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"retime-keyframe",
+		(args) => {
+			if (!args) return;
+			handlers.retimeKeyframe(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-keyframe-curve",
+		(args) => {
+			if (!args) return;
+			handlers.updateKeyframeCurve(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"upsert-effect-param-keyframe",
+		(args) => {
+			if (!args) return;
+			handlers.upsertEffectParamKeyframe(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"remove-effect-param-keyframe",
+		(args) => {
+			if (!args) return;
+			handlers.removeEffectParamKeyframe(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"remove-mask",
+		(args) => {
+			if (!args) return;
+			handlers.removeMask(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"toggle-mask-inverted",
+		(args) => {
+			if (!args) return;
+			handlers.toggleMaskInverted(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"insert-freeform-path-mask-point",
+		(args) => {
+			if (!args) return;
+			handlers.insertFreeformPathMaskPoint(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"create-scene",
+		(args) => {
+			if (!args) return;
+			handlers.createScene(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"delete-scene",
+		(args) => {
+			if (!args) return;
+			handlers.deleteScene(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"rename-scene",
+		(args) => {
+			if (!args) return;
+			handlers.renameScene(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"switch-scene",
+		(args) => {
+			if (!args) return;
+			handlers.switchScene(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"remove-bookmark",
+		(args) => {
+			if (!args) return;
+			handlers.removeBookmark(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-bookmark",
+		(args) => {
+			if (!args) return;
+			handlers.updateBookmark(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"move-bookmark",
+		(args) => {
+			if (!args) return;
+			handlers.moveBookmark(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"add-track",
+		(args) => {
+			if (!args) return;
+			handlers.addTrack(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"remove-track",
+		(args) => {
+			if (!args) return;
+			handlers.removeTrack(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"toggle-track-mute",
+		(args) => {
+			if (!args) return;
+			handlers.toggleTrackMute(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"toggle-track-visibility",
+		(args) => {
+			if (!args) return;
+			handlers.toggleTrackVisibility(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"rename-project",
+		(args) => {
+			if (!args) return;
+			handlers.renameProject(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"duplicate-projects",
+		(args) => {
+			if (!args) return;
+			handlers.duplicateProjects(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"delete-projects",
+		(args) => {
+			if (!args) return;
+			handlers.deleteProjects(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-project-thumbnail",
+		(args) => {
+			if (!args) return;
+			handlers.updateProjectThumbnail(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"close-project",
+		() => {
+			handlers.closeProject(editor);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"insert-element",
+		(args) => {
+			if (!args) return;
+			handlers.insertElement(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-element-trim",
+		(args) => {
+			if (!args) return;
+			handlers.updateElementTrim(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-element-retime",
+		(args) => {
+			if (!args) return;
+			handlers.updateElementRetime(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"move-elements",
+		(args) => {
+			if (!args) return;
+			handlers.moveElements(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"update-elements",
+		(args) => {
+			if (!args) return;
+			handlers.updateElements(editor, args);
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"insert-captions-as-text-track",
+		(args) => {
+			if (!args) return;
+			handlers.insertCaptionsAsTextTrack(editor, args);
 		},
 		undefined,
 	);

@@ -142,6 +142,7 @@ function PreviewCanvas({
 	const lastFrameRef = useRef(-1);
 	const lastSceneRef = useRef<RootNode | null>(null);
 	const renderingRef = useRef(false);
+	const [rendererError, setRendererError] = useState<string | null>(null);
 	const { width: nativeWidth, height: nativeHeight } = usePreviewSize();
 	const viewportSize = useContainerSize({ containerRef: viewportRef });
 	const editor = useEditor();
@@ -170,7 +171,23 @@ function PreviewCanvas({
 	useEffect(() => {
 		const mount = canvasMountRef.current;
 		if (!mount) return;
-		const outputCanvas = renderer.getOutputCanvas();
+
+		// getOutputCanvas() initializes the wgpu compositor on first call, which
+		// throws if WebGPU isn't available (Safari/Firefox, or a GPU-less host).
+		// There's no polyfill for a genuinely GPU-backed renderer, so on failure
+		// we skip mounting the canvas and surface the reason instead of letting
+		// this crash the component tree with no error boundary above it.
+		let outputCanvas: HTMLCanvasElement;
+		try {
+			outputCanvas = renderer.getOutputCanvas();
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			// Deferred to a microtask: setState synchronously inside an effect
+			// body triggers a cascading render (react-hooks/set-state-in-effect).
+			queueMicrotask(() => setRendererError(message));
+			return;
+		}
+
 		outputCanvas.style.display = "block";
 		outputCanvas.style.width = "100%";
 		outputCanvas.style.height = "100%";
@@ -183,7 +200,7 @@ function PreviewCanvas({
 	}, [renderer]);
 
 	const render = useCallback(() => {
-		if (!renderTree || renderingRef.current) return;
+		if (!renderTree || renderingRef.current || rendererError) return;
 
 		const renderTime = Math.min(
 			editor.playback.getCurrentTime(),
@@ -194,10 +211,7 @@ function PreviewCanvas({
 		);
 		const frame = Math.floor(renderTime / ticksPerFrame);
 
-		if (
-			frame === lastFrameRef.current &&
-			renderTree === lastSceneRef.current
-		) {
+		if (frame === lastFrameRef.current && renderTree === lastSceneRef.current) {
 			return;
 		}
 
@@ -208,8 +222,19 @@ function PreviewCanvas({
 			.render({ node: renderTree, time: renderTime })
 			.then(() => {
 				renderingRef.current = false;
+			})
+			.catch((error: unknown) => {
+				// A render failure mid-session (context loss, an unrecoverable
+				// wasm-side error) previously left renderingRef stuck `true`
+				// forever -- the RAF loop would silently stop trying, freezing
+				// the last good frame with no explanation. Surface it and stop
+				// retrying every frame instead of failing the same way in a loop.
+				renderingRef.current = false;
+				setRendererError(
+					error instanceof Error ? error.message : String(error),
+				);
 			});
-	}, [renderer, renderTree, editor.playback, editor.timeline]);
+	}, [renderer, renderTree, editor.playback, editor.timeline, rendererError]);
 
 	useRafLoop(render);
 
@@ -308,20 +333,35 @@ function PreviewCanvas({
 								ref={viewportRef}
 								className="relative flex size-full min-h-0 min-w-0 items-center justify-center overflow-hidden"
 							>
-							<div
-								ref={canvasMountRef}
-								className="absolute block border"
-								style={{
-									left: viewport.sceneLeft,
-									top: viewport.sceneTop,
-									width: viewport.sceneWidth,
-									height: viewport.sceneHeight,
-									background:
-										activeProject.settings.background.type === "blur"
-											? "transparent"
-											: activeProject?.settings.background.color,
-								}}
-							/>
+								<div
+									ref={canvasMountRef}
+									className="absolute block border"
+									style={{
+										left: viewport.sceneLeft,
+										top: viewport.sceneTop,
+										width: viewport.sceneWidth,
+										height: viewport.sceneHeight,
+										background:
+											activeProject.settings.background.type === "blur"
+												? "transparent"
+												: activeProject?.settings.background.color,
+									}}
+								>
+									{rendererError && (
+										<div className="bg-background/95 text-muted-foreground flex size-full flex-col items-center justify-center gap-1 p-4 text-center text-xs">
+											<p className="text-foreground font-medium">
+												Preview unavailable
+											</p>
+											<p>
+												WebGPU isn&apos;t available in this browser or on this
+												device. Try the latest Chrome or Edge on desktop.
+											</p>
+											<p className="text-muted-foreground/70">
+												{rendererError}
+											</p>
+										</div>
+									)}
+								</div>
 								<PreviewOverlayLayer
 									instances={overlayInstances}
 									plane="under-interaction"

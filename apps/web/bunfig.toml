@@ -1,0 +1,2 @@
+[test]
+preload = ["./headless/wasm-bindgen-bun-plugin.ts", "./headless/test-canvas-polyfill.ts"]

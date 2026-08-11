@@ -1,0 +1,558 @@
+# OpenCut Fork (working name) — Goals (north-star cascade)
+
+> North star: the video editor where every capability a human can click is also a command
+> an AI agent can call — so DaVinci-grade grading, FCP-grade editing, CapCut-grade social
+> speed, and Descript-grade text editing all become programmable from one core.
+> Source: VISION.md (v3) · _Last updated: 2026-08-06 · Plan version: v2.1_
+
+## Alignment anchors (every goal must serve these)
+
+**Pillars:**
+- The UI is just one client of the control surface — every capability is a versioned,
+  typed Action both the UI and an AI agent call identically.
+- The Rust core (and, until fully migrated, the existing Action layer) stays the single
+  source of truth for logic — no shadow API for agent control.
+- Preserve ~90% of classic's current feature surface; extend, don't replace, unless a
+  module is explicitly superseded.
+- MIT / open source, serving both internal automation use (Reelwire/Cutroom-style
+  pipelines) and a public product — same architecture, no fork between the two.
+- Augment the expert editor, don't replace them.
+
+**Non-goals (out of scope now):** plugin marketplace, mobile app, matching the rewrite's
+Rust-core Editor API 1:1, Fairlight-grade audio mixing, node-based VFX/compositing,
+transcript-driven editing, templates/social export layer, MCP server, desktop (GPUI)
+parity. (Node-based color grading was on this list until Goal 4 — see below.)
+
+**MVP boundary:** In = fork classic (done), a complete + documented Action API covering
+every current UI-triggerable operation, and headless invocation sufficient for a script to
+produce a real, finished edit end-to-end with zero GUI. Out = everything in the non-goals
+list above, deferred to VISION.md's Next/Later milestones. **Explicit exception:** Goal 4
+(color grading foundation, `DAVINCI_PARITY.md` Phase 1) is Later-milestone work pulled
+forward ahead of Goal 3's proof gate on direct user instruction ("execute," given
+immediately after reviewing the phased roadmap) — recorded here as a conscious MVP-
+boundary override, not a silent redefinition of what "MVP" means going forward.
+
+## Goals
+
+### Goal 1 — Every UI operation is a documented Action, with zero gaps · serves: core value prop
+**Done when:** every currently UI-triggerable operation in classic has a corresponding
+registered Action with typed args and a doc entry per the existing `docs/actions.md`
+pattern; no UI handler calls `editor.xxx()` directly, bypassing `invokeAction`.
+**Status:** done 2026-08-06 (70 Actions registered, `GAP_MAP.md` v1.1). The
+media-import gap flagged when 1a/1b were first marked done (paste/drag-drop bypassing
+the Action layer) is now closed too: `add-media-asset` wraps
+`MediaManager.addMediaAsset` directly, and the deferred design question ("what does an
+agent hand over instead of a browser `File`?") resolved to "a pre-processed `MediaAsset`
+object" — the manager already took that shape, so no new design was actually needed.
+Verified headlessly via `apps/web/headless/run.ts` + `media-import-example-steps.json`:
+a real file's bytes persist correctly through both storage layers. Automatic probing of
+a raw file's duration/dimensions/fps (what `processMediaAssets` does in the browser
+flow) remains unverified headlessly and is real, separate, deferred work — a caller
+supplying those fields itself sidesteps it, as the kept example does. `use-paste-media.ts`
+and `drag-drop-controller.ts` correctly keep calling managers directly (browser-event-
+driven, nothing to route through `invokeAction`), which is by design, not a lingering gap.
+**Sub-goals:**
+- [x] **1a** Audit every UI-triggerable operation across `apps/web` (buttons, menus,
+  shortcuts, panels) and produce a gap-map: covered-by-an-Action vs. direct-handler-bypass
+  — _advances:_ makes the actual size of the gap visible before closing it — _accept:_ a
+  written gap-map covering 100% of currently-triggerable operations, each tagged
+  covered/gap. **Done 2026-08-06 — see `GAP_MAP.md`.** Found 30 registered Actions vs. ~38
+  manager-level mutating methods (`TimelineManager`/`ScenesManager`/`ProjectManager`,
+  backed by 53 `Command` classes under `apps/web/src/commands/`); only ~12 have any
+  Action-layer coverage. 26 methods have zero coverage, including `ProjectManager.export`
+  — the single highest-value gap, since without it an agent cannot produce an actual
+  output file through the Action API at all. Whole subsystems (effects, keyframes/
+  animation, masks, scene CRUD, track-level ops, project lifecycle) are currently
+  unreachable via any Action.
+- [x] **1b** Close every gap from 1a, in `GAP_MAP.md`'s Tier 1 → 2 → 3 order — register
+  the missing Action per `docs/actions.md`,
+  or refactor the handler to route through `invokeAction` — _advances:_ completes the
+  control surface that Goal 2 and Goal 3 depend on — _accept:_ gap-map re-run shows zero
+  remaining gaps; each new Action is documented. **Tier 1 done 2026-08-06** —
+  `export-project`, `create-project`, `load-project`, `save-project`,
+  `update-project-settings` registered (PR #1); 34 Actions total. **Tier 2's effects
+  subsystem done 2026-08-06** — `add-clip-effect`, `remove-clip-effect`,
+  `toggle-clip-effect`, `reorder-clip-effects`, `update-clip-effect-params` registered
+  (PR #1); 39 Actions total. **Tier 2's keyframes/animation subsystem done 2026-08-06** —
+  `upsert-keyframe`, `retime-keyframe`, `update-keyframe-curve`,
+  `upsert-effect-param-keyframe`, `remove-effect-param-keyframe` registered (PR #1);
+  44 Actions total. **Tier 2's masks subsystem done 2026-08-06** — `remove-mask`,
+  `toggle-mask-inverted`, `insert-freeform-path-mask-point` registered (PR #1);
+  47 Actions total. **Tier 2's scene CRUD subsystem done 2026-08-06** — `create-scene`,
+  `delete-scene`, `rename-scene`, `switch-scene` registered, plus `remove-bookmark`,
+  `update-bookmark`, `move-bookmark` (3 gaps missed in the original 1a audit, caught and
+  closed alongside — see `GAP_MAP.md` v0.6) (PR #1); 54 Actions total. **Tier 2's tracks
+  subsystem done 2026-08-06** — `add-track`, `remove-track`, `toggle-track-mute`,
+  `toggle-track-visibility` registered (PR #1); 58 Actions total. **Tier 2's
+  project-library-lifecycle subsystem done 2026-08-06 — Tier 2 fully closed** —
+  `rename-project`, `duplicate-projects`, `delete-projects`, `update-project-thumbnail`,
+  `close-project` registered (PR #1); 63 Actions total. **Tier 3 + the direct-bypass
+  audit done 2026-08-06** — `insert-element`, `update-element-trim`,
+  `update-element-retime`, `move-elements`, `update-elements`, plus
+  `insert-captions-as-text-track` (the one genuine bypass gap; `subtitles/insert.ts` was
+  a pure function, closeable like any other Tier 3 item) registered (PR #1); 69 Actions
+  total, `GAP_MAP.md` v1.0. Marking 1b done: every identified gap traceable to a
+  same-shape closure (register an Action, wrap the existing manager method) is closed.
+  One deliberately-deferred exception remains — see Goal 1's status line below.
+**Loop (if iterative):** each cycle → pick the next open gap from the gap-map (largest-
+used-operation first), close it, re-run the gap-map, report the new gap count. Stop when
+the gap-map shows zero gaps.
+
+### Goal 2 — A headless shell can invoke the Action API with zero GUI · serves: core value prop, "agentic/headless editing" workflow
+**Done when:** an external script/CLI can load a project, invoke Actions against it, and
+produce a valid, openable/exportable project — with no browser or desktop app involved.
+**Status:** 2a and 2b's own accept criteria both met 2026-08-06. One honest caveat on
+Goal 2's overall done-when: "openable" is met (the saved file is the same storage
+format the real app reads); "exportable" is met only in the sense that the Action
+dispatches and reports errors correctly — actually rendering real content is currently
+blocked on a genuine WebGPU gap (below), not yet true end-to-end. `apps/web/headless/
+run.ts` loads/creates a project and runs named Actions from a `steps.json` file against
+real files on disk, verified end-to-end (a settings change + a track add, correctly
+persisted and correctly pruned respectively). Also specifically checked
+`export-project` (fire-and-forget, so checked by polling `getExportState()` rather than
+trusting the call not throwing): it dispatches and completes its lifecycle correctly on
+an empty project, resolving with a legitimate business-logic rejection
+(`"Project is empty"`), not an infra crash — so the Action mechanism itself works
+headlessly. **Exporting a project with real content: traced to a root cause, and it's
+bigger than expected.** Followed the actual call chain (`RendererManager.exportProject`
+→ `SceneExporter` → `CanvasRenderer.render()` → `wasmCompositor` → WASM
+`initCompositor`/`renderFrame`) and tested each link directly under Bun:
+`initCompositor` requires `initializeGpu()` first, which throws `"No WebGPU adapter is
+available"` — confirmed Bun has no `navigator.gpu` at all. **This project's compositor
+needs genuine WebGPU; there's no software/CPU fallback and no simple polyfill for it**
+(a `@napi-rs/canvas` install was tried and reverted — it only covers 2D canvas APIs,
+unrelated to GPU adapter acquisition, wouldn't have helped). Real fixes are all
+substantially bigger than a session continuation: a native WebGPU binding for Bun/Node,
+a CPU rendering fallback in the Rust engine itself, or running the headless entry inside
+a real GPU-capable browser (headless Chrome via Playwright) instead of bare Bun. **Net
+effect: the headless shell edits and persists a project completely correctly, but
+cannot currently render one** — not "unverified," genuinely can't, until one of the
+above gets built. See `HEADLESS_DESIGN.md` v1.5 for the full chain and evidence.
+**Sub-goals:**
+- [x] **2a** Design the headless invocation contract — CLI vs. local server transport, how
+  a caller addresses a project and invokes an Action with args. Explicitly does NOT need to
+  resolve the MCP-vs-REST open question from VISION.md yet — that's a Next-milestone
+  decision — _advances:_ gives Goal 2 a concrete shape before building it — _accept:_ a
+  short written invocation contract. **Done 2026-08-06 — see `HEADLESS_DESIGN.md`.**
+  Key findings: `EditorCore.getInstance()` already has no browser dependency at
+  construction (good news, wasn't obvious); the one confirmed blocker is
+  `StorageService` hardcoding `IndexedDBAdapter`/`OPFSAdapter`, fixable by adding
+  Node-backed adapters implementing the existing `StorageAdapter<T>` interface and
+  branching on environment, not a parallel storage layer. Transport decision: a
+  single-process script running an ordered `steps.json` of `{action, args}` calls against
+  one loaded project (not a CLI-per-Action-call — that would throw away the in-memory
+  undo/redo session Deriv8ion's per-command-process CLI pattern doesn't need to preserve
+  — and not a local server, since that's really the deferred MCP question). Flagged for
+  2b: `SaveManager`'s 800ms debounced auto-save means a one-shot script must explicitly
+  `save-project` and wait before exit; `RendererManager`/`AudioManager`/`toast` calls are
+  unverified outside a browser and need a smoke test, not an assumption either way.
+- [x] **2b** Implement the headless shell as a new thin shell alongside `apps/web` and
+  `apps/desktop`, calling the same Action layer Goal 1 completed — no parallel/duplicate
+  logic — _advances:_ the Action-layer-stays-source-of-truth principle — _accept:_ the
+  shell loads a real project, invokes at least one Action end-to-end, and persists the
+  result correctly. **Done 2026-08-06** — the account below (started, hit the WASM
+  blocker, fixed it, then found the deeper WebGPU rendering gap) is kept in full as the
+  real record, but the final state is: `apps/web/src/actions/handlers.ts` extracts the
+  ~39 thin-wrapper Actions into plain functions shared between the React hook and the
+  headless runner, and `apps/web/headless/run.ts` dispatches real named Actions (not
+  manager-method shortcuts) from a `steps.json` file — verified end-to-end, satisfying
+  2b's accept criteria exactly as written. **Started 2026-08-06, blocked partway through — see
+  `HEADLESS_DESIGN.md`'s v1.1 correction.** Storage layer is done and verified for real
+  (`FileSystemAdapter`/`FileSystemBlobAdapter`, `StorageService` branches on environment;
+  a standalone script round-tripped set/get/list/getAll/remove/clear against real files
+  on disk under Bun). Bootstrapping `EditorCore` headlessly is **not** done: actually
+  running `EditorCore.getInstance()` under `bun run` (not just typechecking it) throws —
+  `opencut-wasm`'s glue code expects a bundler to auto-instantiate its `.wasm` binary,
+  which Bun's native WASM import doesn't do the same way, and this fires at module-load
+  time just from importing `@/core` transitively (MediaTime utilities share a compiled
+  module with this package's GPU-compositing code). 2a's "no browser dependency at
+  construction" claim was checked by reading the constructor, not by running it — this is
+  the gap between those two, caught before being reported as done. **Tried the proposed
+  fix (Next.js-server-runtime path) — it also fails, for an unrelated reason**: a real
+  Route Handler smoke test (`next dev` + `curl`, not a guess) shows `ScenesManager`
+  transitively imports a React component (`bookmarks.tsx`) through a barrel file
+  (`@/timeline/bookmarks/index.ts` mixes logic exports with component exports), which
+  Next's RSC compiler rejects outright. Both v1.1's candidate fixes were known-blocked
+  for two unrelated reasons at that point. **Then the WASM blocker was actually fixed
+  (`HEADLESS_DESIGN.md` v1.3)**: `apps/web/headless/wasm-bindgen-bun-plugin.ts`, a real
+  `Bun.plugin` that instantiates wasm-bindgen "bundler"-target `.wasm` binaries under
+  bare Bun by introspecting the compiled module's import section
+  (`WebAssembly.Module.imports()`) and wiring it to its glue JS file directly — no
+  Next.js involved, sidestepping the v1.2 barrel issue entirely (confirmed: "use client"
+  is a Next-RSC-only concept, bare Bun doesn't enforce it). Verified escalating from a
+  standalone `opencut-wasm` call, to `EditorCore.getInstance()` constructing cleanly, to
+  a full create→mutate→save→reset→reload round-trip
+  (`apps/web/headless/bootstrap-proof.ts`, kept in the repo) — all pass. Along the way,
+  fixed a genuinely pre-existing bug on the critical path:
+  `migrations/runner.ts` called `IndexedDBAdapter`'s constructor with 3 positional args
+  against a 1-object-arg signature (already flagged by `tsc` in this session's very
+  first baseline, unrelated to headless work, just never hit until `loadProject` was
+  actually exercised outside a browser). `v1-to-v2.ts` has the same bug in 3 more spots,
+  left unfixed — legacy-migration-only, out of scope for this pass.
+  **Precision note (resolved)**: at this point in the work, the proof only called
+  `editor.project.updateSettings(...)` (the manager method) directly, not through
+  `invokeAction` — proving `EditorCore` + persistence work headlessly, not yet that a
+  registered Action does. The handler-extraction work above closed that gap for real;
+  2b's actual accept criteria (invoke an Action end-to-end) is now genuinely met, not
+  just the bootstrapping prerequisite.
+
+### Goal 3 — A real headless edit proves the Action API is valuable, not just complete · serves: mitigates VISION.md's named risk (stalling at automation-API-complete/feature-thin)
+**Done when:** a real, non-toy scripted/agentic edit is produced entirely through the
+headless shell + Action API, zero GUI involved, and a human stakeholder confirms it's
+genuinely something they'd use — not just mechanically correct output.
+**Status:** todo (blocked on Goal 2)
+**Sub-goals:**
+- [ ] **3a** Pick a concrete, specific, non-toy edit scenario (e.g. script-to-cut from
+  real footage you'd actually want edited) — _advances:_ makes "proof" demoable rather than
+  hand-wavy — _accept:_ the scenario is specific enough that success/failure is obvious.
+- [ ] **3b** Execute the scenario fully headless and get explicit human sign-off — _advances:_
+  this sub-goal **is** the non-negotiable gate from VISION.md's roadmap — _accept:_ the
+  human stakeholder explicitly confirms the result is useful, not merely that it ran
+  without errors.
+
+**This goal is the gate.** Per VISION.md v2's roadmap, Next (transcript editing,
+auto-captions, MCP server) does not start until Goal 3 passes. If it doesn't pass, that's
+signal the problem is feature depth, not API completeness — revisit scope, don't proceed
+on autopilot.
+
+### Goal 4 — Color grading foundation is a documented, agent-drivable Action surface · serves: core value prop ("DaVinci-grade grading" from the north star, "UI is just one client of the control surface" pillar)
+**Done when:** primary wheels, log wheels, RGB/luma curves, HSL/RGB/luma qualifiers,
+basic exposure/white-balance controls, a basic serial+parallel node graph, and LUT
+(1D/3D `.cube`) import/apply can all be built on a clip entirely through registered
+Actions, with grading state correctly persisted and headlessly verifiable — the same
+rigor `GAP_MAP.md` established for Goal 1. Scopes (waveform/vectorscope/histogram/
+parade) exist as verification tooling, with their own pixel-level correctness
+explicitly gated on the still-unresolved WebGPU rendering blocker, not assumed solved.
+_(Exposure/white-balance added to this clause 2026-08-06 — the original Phase 1 scope
+always included "basic RAW exposure/WB/temp-tint controls," but 4a's gap-map and this
+clause both missed it; see `COLOR_GRADING_DESIGN.md` gap-map item 9 for the correction.)_
+
+**Status:** in-progress — 4a done 2026-08-06; 4b started, primary wheels, log wheels,
+HSL qualifier, luma qualifier, luma curve, rgb curves, LUT import/apply, the serial node
+graph, exposure + white-balance, and all four scopes' core computations
+(histogram/waveform/vectorscope/parade) closed. Scopes' Action/UI
+wiring in progress: WASM bindings (`rust/wasm/src/scopes.rs`, committed) and a TS
+service layer (`@/services/color-scope/service.ts`, written + verified via local link,
+not yet committed) are done, both real-verified through the actual JS/WASM bridge —
+**blocked on a real packaging gap**, not a code problem: `apps/web` depends on
+upstream's published `opencut-wasm@^0.2.10`, which doesn't have this fork's new Rust
+work at all (not just scopes — none of Goal 4's shaders reach the shipped app without a
+publish). User decided (2026-08-06): publish this fork's own scoped package
+(`@connorodea/opencut-wasm`). `rust/wasm/Cargo.toml` bumped to 0.3.0 and repointed at
+this fork's repo, `rust/wasm/pkg` built and ready — **publish itself blocked on npm
+auth** (`npm whoami` returns 401 in this environment; asked the user to run `npm login`
+via the `!` prompt prefix). Publish prep finished 2026-08-06 while still blocked: root
+MIT `LICENSE` copied into `rust/wasm/` (wasm-pack was warning none existed), the
+upstream-branded `rust/wasm/README.md` corrected to this fork's package name/repo (same
+misleading-metadata class already fixed in `Cargo.toml`), and `--scope connorodea` baked
+into `build:wasm`/`dev:wasm` in `package.json` so the pre-existing `publish:wasm` script
+now produces the correctly-scoped package by default. **`npm login` completed 2026-08-06**
+(`npm whoami` now returns `connorodea`) — but `npm publish` turned out to need its own
+separate one-time-password confirmation, whose auth URL npm deliberately redacts outside
+a real interactive terminal, so that step is handed to the user the same way login was.
+**`scripts/repin-opencut-wasm.sh` written and `--dry-run` verified 2026-08-06** — the
+post-publish repin (rewrite ~30 `"opencut-wasm"` imports to `"@connorodea/opencut-wasm"`,
+update `apps/web/package.json`, `bun install`, re-verify tsc/tests) is now a single
+command instead of a re-derived file list. The dry run caught a real bug before it did
+anything: the rewrite `sed` used `/` as its delimiter, but `@connorodea/opencut-wasm`
+also contains `/`, so `sed` misparsed the command and would have produced empty output
+(silently deleting every rewritten file's contents) — fixed by switching to `|` as the
+delimiter, re-verified clean. The moment `npm publish` clears its OTP step: `./scripts/
+repin-opencut-wasm.sh` (no dry-run flag), review the diff, commit alongside the
+already-written service.ts + 2 headless proof scripts. Not blocking: a visual
+scope-panel UI component (displaying the data graphically) is a separate, larger,
+not-yet-started stretch beyond what "Done when" strictly requires — Goal 4's framing is
+"documented, agent-drivable Action surface," and `computeFrameScope`/
+`computeFrameScopeFromImageData` already satisfy "queryable" the same way
+`waveformCache.getSourceSummary` (this codebase's own audio-waveform precedent) is
+agent-callable without ever being wired into the formal Action/keybinding system.
+**Explicit sequencing override, recorded rather
+than silently skipped:** `DAVINCI_PARITY.md` and this document's own Sequencing section
+both state Later-milestone work (which this is — `DAVINCI_PARITY.md` Phase 1) stays
+gated behind Goal 3 passing, and Goal 3 has not passed — it's still blocked on a
+human-supplied real edit scenario (see Goal 3's status above, unchanged by this). The
+user said "execute" immediately after reviewing the phased DaVinci roadmap; treated as
+direct, explicit authorization to start Phase 1 now, overriding the stated gate for this
+one goal. This does not lift the gate for Phases 2–5 or for Goal 3 itself — each future
+Later-phase start needs its own explicit go-ahead the same way, not an implied blanket
+release once one override happens.
+
+**Sub-goals:**
+- [x] **4a** Audit `DAVINCI_PARITY.md`'s Phase 1 scope against the current codebase,
+  design the grading data model (where grade state lives — a new field set on
+  `TimelineElement`? a parallel `Command`/`Manager` pair mirroring how effects work?
+  what shape do primary/curve/qualifier/node/LUT data take?), and produce a gap-map the
+  same way `GAP_MAP.md` did for Goal 1 — _advances:_ makes the real shape of the work
+  visible before building it, avoiding Goal 1's own early under-scoping mistake (the
+  original v0.1 gap-map missed 3 methods) — _accept:_ a written design + gap-map
+  covering every Phase 1 item from `DAVINCI_PARITY.md`, each tagged with its target
+  Action name(s) and whether it needs new data-model work or fits the existing
+  `add-clip-effect`-style granular-Action pattern directly. **Done 2026-08-06 — see
+  `COLOR_GRADING_DESIGN.md`.** Key finding: grade state needs no new top-level data
+  structure — every Phase 1 primitive (wheels, log wheels, curves, qualifiers, LUTs)
+  fits as a new `EffectDefinition` using Actions already closed in Goal 1 (`add-clip-
+  effect`/`update-clip-effect-params`/etc.), and a serial node graph is already free
+  (the effects list's existing ordering behavior) — only *parallel* node graphs need
+  real new data-model work, recommended deferred past 4b's first pass. The harder,
+  non-obvious part isn't in `apps/web` at all: this repo also contains the Rust engine
+  (`rust/crates/{effects,gpu,masks,compositor}`, compiling to the `opencut-wasm` npm
+  package `apps/web` depends on), and its effect-uniform-packing code
+  (`rust/crates/effects/src/pipeline.rs`) is hardcoded to Gaussian blur's specific
+  uniform names — adding any genuinely different effect requires generalizing that
+  function first, not just adding a shader file. Confirmed the Rust→WASM build
+  toolchain actually works (installed `wasm-pack`, ran a clean `bun run build:wasm`,
+  succeeded) rather than trusting the README. Also found, and separately documented in
+  `HEADLESS_DESIGN.md` v1.6: native Rust `wgpu` has real, working GPU access on this
+  machine via Metal (verified by a passing test), completely unaffected by the
+  browser/Bun WebGPU gap that blocks 2b's rendering — meaning new grading shaders can
+  plausibly be visually verified via native `cargo test` independent of whether that
+  browser-side gap ever closes.
+- [ ] **4b** Close every gap from 4a, subsystem by subsystem in `DAVINCI_PARITY.md`'s
+  listed order (primary/log wheels → curves → qualifiers → node graph → LUTs → scopes)
+  — register each Action per `docs/actions.md`, verify headlessly via
+  `apps/web/headless/run.ts` using state-persistence checks (create/mutate/save/reload/
+  confirm) — _advances:_ completes Phase 1's Action surface — _accept:_
+  gap-map re-run shows zero remaining gaps for Phase 1's defined scope; scopes
+  specifically get flagged as state-only-verified (UI/wiring done, pixel-correctness
+  blocked on the Bun/browser WebGPU gap) rather than marked fully done — don't let a
+  scope's accept criteria quietly assume rendering works, the same discipline Goal 2's
+  `export-project` check applied. **Update:** state-persistence checks turn out not to
+  be the accept-criteria ceiling `HEADLESS_DESIGN.md` v1.5 implied — v1.6's native-GPU
+  finding means real pixel-correctness verification (native `cargo test`, not
+  Bun/browser) is available for shader-backed subsystems (wheels, curves, qualifiers,
+  LUTs); apply it wherever a subsystem has real pixel math to check, not just state.
+  **Primary wheels done 2026-08-06** — see `COLOR_GRADING_DESIGN.md`'s gap-map;
+  verified both ways (native-GPU pixel test + headless state-persistence proof).
+  **Log wheels done 2026-08-06** — same two-way verification; deliberately different
+  (additive, not power-curve) formula for log-encoded footage, documented as such
+  rather than assumed identical to primary wheels. **HSL qualifier done 2026-08-06** —
+  DaVinci's "Highlight" preview mode (soft H/S/L range membership, non-matching pixels
+  dim to grayscale); checked `rust/crates/masks` first as this doc recommended, found
+  it's a genuinely different technique (geometric SDF masks, not color keying) and
+  said so rather than forcing a fit. Does not gate a downstream chained correction
+  (full secondary grading) — real, separate, deferred pipeline work, stated explicitly.
+  **Luma curve done 2026-08-06, scoped down from the original plan** — a fixed 5-point
+  Catmull-Rom spline evaluated from uniform scalars instead of the texture-backed LUT
+  originally assumed necessary (needed zero new pipeline infrastructure). Caught and
+  fixed a real boundary-condition bug via the test itself (an "identity" curve was
+  silently distorting input near the edges) rather than shipping on the first green
+  build. **LUT import/apply done 2026-08-06** — the item that actually introduces
+  texture-backed passes to the pipeline (a new `lut_pipeline_layout`/3rd bind group,
+  since wgpu bakes bind-group layouts in at pipeline creation and the shared 2-group
+  layout couldn't grow one). 3D LUT stored as a tiled-2D texture (9 tiles of 9x9, one
+  per blue slice), sampled nearest-neighbor via `textureLoad` rather than trilinear —
+  avoids cross-tile bleed a filtering sampler would cause at tile edges. Fixed 9^3 grid,
+  not real `.cube` files' 17/33/65 — a TS-side parser (`parse-cube.ts`) nearest-neighbor
+  resamples any source size down to fit, with its own `bun:test` suite (parse, resample,
+  identity-preservation). LUT data itself flows through the existing
+  `UniformValue::Vector` wire format unchanged — confirmed no new FFI plumbing was
+  needed by reading `rust/wasm/src/effects.rs` before writing any code. Stored on the
+  effect as a JSON-encoded flat array in a `text` param (no array/blob `ParamValue`
+  type exists) — documented as a real v1, not the eventual LUT-library architecture.
+  Same two-way verification as everything else (5 native-GPU pixel tests incl. an
+  independently-predicted channel-swap case + headless state-persistence proof, all
+  pass). **Serial node graph done 2026-08-06** — was assumed free (the effects list's
+  existing order) from reading `apply_with_encoder`'s structure, but that inference had
+  never actually been run. Added a real pixel test chaining two non-commutative passes
+  (multiplicative gain, additive offset) in both orders: each ordering matches its own
+  independently hand-computed expected value, and the two orderings genuinely differ,
+  proving pass 2 truly consumes pass 1's output and order is respected end to end — the
+  same "don't trust an inference you haven't run" discipline the luma-curve bug taught.
+  Scopes next and last in the gap-map's ranked order. **Histogram's core computation
+  done 2026-08-06** — first of the four scope types (waveform/vectorscope/histogram/
+  parade). **Correction:** this doc previously said scope pixel-correctness was blocked
+  on the browser/Bun WebGPU rendering gap; that repeated item 4's original mistake —
+  v1.6 already showed native `cargo test` has real GPU access regardless of that gap,
+  and scopes are read-only analysis (texture readback + CPU binning), not a rendering
+  pass, so nothing about them was ever actually blocked. `effects::compute_histogram`
+  verified against a hand-counted expected histogram for a known image, including
+  asserting every non-matching bucket is exactly zero. **Waveform's core computation
+  also done 2026-08-06** (`effects::compute_waveform`) — per-column luma histograms,
+  full horizontal resolution; verified columns stay independent (no cross-column
+  leakage) and that two distinct luma values in one column stay as two separate buckets
+  rather than being merged. **Vectorscope and parade also done 2026-08-06**
+  (`effects::compute_vectorscope`, `effects::compute_parade`) — full-swing BT.601 Cb/Cr
+  binned into a 256x256 grid (achromatic grays verified to land exactly at center at
+  every brightness; distinct hues verified to land at distinct, independently-predicted
+  buckets), and parade as `waveform.rs` generalized from one collapsed luma channel to
+  three independent R/G/B channels (verified with a color chosen so cross-channel
+  leakage would be visible, asserting the other two channels are zero at each channel's
+  own spike). **All four scope types' core computations are closed.** Only Action/UI
+  wiring remains — these are read-only Rust computations with no registered Action
+  reaching them yet, a distinct, real gap from the computation itself being correct.
+  **Exposure + white balance done 2026-08-06 — a gap-map correction, not a
+  scheduled item.** Found while blocked waiting on the scopes npm-publish step (below)
+  by re-reading this doc rather than idling: the original Phase 1 scope always included
+  "basic RAW exposure/WB/temp-tint controls," but 4a's gap-map and this clause's own
+  "Done when" never listed it — a genuine miss, the same class of mistake this doc warns
+  against repeating (Goal 1's v0.1 gap-map missed 3 methods). Scoped down like every
+  other primitive: not DaVinci's actual RAW page (true camera-sensor decode, which this
+  codebase has no support for anywhere), but two ordinary `EffectDefinition`s —
+  `exposure` (EV-stops scalar, `output = input * 2^ev`) and `white-balance`
+  (temperature/tint as a relative correction, not absolute Kelvin/blackbody math, same
+  as DaVinci's own WB slider). Verified on native GPU against independently
+  hand-computed references: EV=0 and temp/tint=0 are both true no-ops, +1/-1 EV exactly
+  double/halve, positive temperature measurably warms and positive tint measurably
+  shifts toward magenta, matching the shaders' own documented coefficients — plus the
+  usual headless state-persistence proofs for both.
+  **RGB curves done 2026-08-06 — a second gap-map correction.** 4a's original
+  data-model table planned `"rgb-curves"` and `"luma-curve"` as separate
+  `EffectDefinition`s, but only luma-curve was built — which shares one curve across
+  all three channels, not the independent-per-channel curves DaVinci's RGB Curves panel
+  gives. Silently dropped when item 4 closed; found the same way as the exposure/WB
+  miss, re-reading the design doc while still blocked on the npm publish. Needed 15
+  scalar uniforms (5 points x 3 channels), more than `scalars`/`scalars_b` held —
+  extended `EffectUniformBuffer` with `scalars_c`/`scalars_d`, re-verified
+  `cargo test --workspace` clean *before* writing the new shader. Reuses luma-curve's
+  proven Catmull-Rom math/boundary fix three times over. The test that actually matters
+  here isn't curve correctness (already proven) — it's that changing only red's curve
+  leaves green/blue provably untouched on native GPU, plus all three channels
+  independently matching their own reference with genuinely different deltas.
+  **Luma qualifier done 2026-08-06 — a third gap-map correction, closed via reuse
+  rather than new GPU work.** "HSL/RGB/luma qualifiers" — HSL built, RGB explicitly
+  deferred with reasoning, but luma qualifier never mentioned as either. Reading
+  `hsl_qualifier.wgsl`'s own math shows `hue_width=1.0`/`sat_width=1.0` make its
+  hue/saturation gates pass unconditionally (both equal `width*0.5` at the widest
+  possible distance exactly when width=1.0) — `hsl-qualifier` already gives luma-only
+  qualification as a special case. Same move as gap-map item 6 (serial node graph):
+  verified the reuse claim on real pixels (matching luma passes full-color regardless
+  of hue; two very different hues at the same luma get pixel-identical treatment) rather
+  than trusting the derived math, then shipped a thin `"luma-qualifier"` `EffectDefinition`
+  (3 focused params) rendering against `hsl-qualifier`'s existing shader with the hue/sat
+  gates hardcoded open — zero new Rust/GPU code. Systematically re-checked
+  `DAVINCI_PARITY.md`'s full Phase 1 "In scope" line against everything shipped after
+  this; no further gaps found. **Full regression sweep run 2026-08-06** while still
+  blocked on the scopes npm publish: all 10 committed grading headless proofs
+  (bootstrap/primary-wheels/log-wheels/hsl-qualifier/luma-curve/luma-qualifier/lut/
+  exposure/white-balance/rgb-curves) re-run fresh and pass, and the full Rust workspace
+  (55 tests across every grading shader + scope computation) re-run clean — real
+  end-to-end confirmation nothing drifted across this session's cumulative Goal 4b work,
+  not just "each item passed when it was closed."
+
+**Loop (if iterative):** each cycle → pick the next open gap from 4a's gap-map, in
+`DAVINCI_PARITY.md`'s listed order, close it (register the Action, verify headlessly via
+state persistence), re-run the gap-map, report the new count. Stop when the gap-map
+shows zero remaining gaps for Phase 1's scope, or a real blocker is hit and documented
+(the way Goal 2 documented the WebGPU blocker) rather than silently worked around.
+
+## Sequencing
+- **Now:** Goal 1 → Goal 2 → Goal 3, in that order (each unblocks the next). This whole
+  cluster **is** VISION.md's "Now" milestone, decomposed. **Goal 4 runs alongside/ahead
+  of Goal 3** as an explicit, recorded override (see Goal 4's status) — this is not a
+  reordering of the Now cluster itself, Goal 3's gate is unchanged for everything after it.
+- **Next:** Not yet decomposed into goals — opens only after Goal 3 passes. Per VISION.md:
+  transcript-driven editing + auto-captioning (Descript/CapCut tier) on the same Action
+  surface, then an MCP server once that surface is stable.
+- **Later:** Fairlight-grade audio mixing, node-based VFX/compositing, template
+  ecosystem, desktop parity, plugin system — `DAVINCI_PARITY.md` Phases 2–5. Scoped in
+  detail (5 phases with FOSS accelerants and license analysis), not started, still gated
+  behind Goal 3's proof gate — Goal 4's override is scoped to Phase 1 only, not a
+  blanket release for the rest.
+
+## Drift watch
+No existing backlog on this fork yet (brand new — nothing to flag against these goals).
+One thing to watch as upstream `opencut-classic` changes get pulled in: its own README
+already marks "Preview panel enhancements (fonts, stickers, effects) and export
+functionality" as **avoid for now** upstream, because they're mid-refactor there. Absorbing
+upstream changes in those areas without checking them against this plan's MVP boundary
+would be silent scope drift — worth a conscious check each time upstream is merged in, not
+an assumption that upstream's priorities match ours.
+
+## Runnable prompts
+
+**/goal — Goal 1:**
+```text
+/goal Goal 1: Every UI operation is a documented Action, with zero gaps
+Serves vision pillar: the UI is just one client of the control surface. Done when: every
+currently UI-triggerable operation in classic/apps/web has a registered, documented Action;
+no handler bypasses invokeAction. Non-goals: don't touch grading/audio/transcript/template
+work, that's Next/Later. Read GOALS.md + VISION.md first.
+Acceptance checks: gap-map shows zero remaining gaps; every new Action is documented per
+docs/actions.md. Report what shipped + what's left.
+```
+
+**/loop — Goal 1 (gap closure):**
+```text
+/loop Goal 1 — close Action API gaps
+Each cycle: re-read the current gap-map, pick the next open gap (largest-used operation
+first), close it (register the Action per docs/actions.md or refactor the handler to use
+invokeAction), re-run the gap-map, report the new count.
+Stop when: gap-map shows zero remaining gaps. Don't repeat already-closed gaps.
+```
+
+**/goal — Goal 2:**
+```text
+/goal Goal 2: A headless shell can invoke the Action API with zero GUI
+Serves vision pillar: the UI is just one client of the control surface; "agentic/headless
+editing" workflow. Done when: an external script/CLI loads a project, invokes Actions
+against it, and produces a valid result — no browser/desktop app involved. Non-goals: don't
+resolve MCP-vs-REST transport yet, don't build the desktop shell. Read GOALS.md + VISION.md
+first, and confirm Goal 1's gap-map is far enough along to cover the operations you'll need.
+Acceptance checks: shell loads a real project, invokes at least one Action end-to-end,
+persists a correct result. Report what shipped + what's left.
+```
+
+**/goal — Goal 3 (the gate):**
+```text
+/goal Goal 3: A real headless edit proves the Action API is valuable
+Serves vision pillar: mitigates the named risk of stalling at automation-API-complete/
+feature-thin. Done when: a real, non-toy scripted edit is produced entirely headless, and a
+human stakeholder confirms it's genuinely useful. Read GOALS.md + VISION.md first.
+Acceptance checks: the scenario is specific and demoable; explicit human sign-off is
+recorded, not assumed. This is a gate — if it doesn't pass, report that plainly and flag
+that VISION.md's Next milestone should not start yet.
+```
+
+**/goal — Goal 4:**
+```text
+/goal Goal 4: Color grading foundation is a documented, agent-drivable Action surface
+Serves vision pillar: DaVinci-grade grading, "the UI is just one client of the control
+surface." Done when: primary/log wheels, curves, HSL/RGB/luma qualifiers, a basic node
+graph, and LUT import/apply are all built entirely through registered Actions, verified
+headlessly via state persistence (not rendering — HEADLESS_DESIGN.md v1.5's WebGPU gap
+blocks that). Non-goals: tracked Power Windows, HDR grading, Face Refinement, temporal
+noise reduction, full ACES/DaVinci Wide Gamut, stereo 3D — DAVINCI_PARITY.md Phase 1
+scope only. Read GOALS.md + DAVINCI_PARITY.md + HEADLESS_DESIGN.md first.
+Acceptance checks: gap-map (4a) shows zero remaining Phase-1 gaps after 4b; every new
+Action documented per docs/actions.md; scopes flagged state-only-verified, not claimed
+fully done. Report what shipped + what's left.
+```
+
+**/loop — Goal 4 (gap closure):**
+```text
+/loop Goal 4 — close color-grading Action gaps
+Each cycle: re-read the current gap-map (4a), pick the next open gap in
+DAVINCI_PARITY.md's Phase 1 order (wheels → curves → qualifiers → node graph → LUTs →
+scopes), close it (register the Action per docs/actions.md, verify headlessly via
+apps/web/headless/run.ts using state-persistence checks), re-run the gap-map, report the
+new count.
+Stop when: gap-map shows zero remaining Phase-1 gaps, or a real blocker is hit and
+documented rather than worked around. Don't repeat already-closed gaps.
+```
+
+## Changelog
+- 2026-08-06 v1 — Initial cascade from VISION.md v2: three goals decomposing the "Now"
+  milestone (complete Action API → headless shell → proof gate), tethered to the core
+  value prop and the risk named in VISION.md's v2 changelog.
+- 2026-08-06 v1.1 — VISION.md v3 fleshed out the "Later" milestone into
+  `DAVINCI_PARITY.md` (5-phase DaVinci-parity roadmap + FOSS accelerant/license map).
+  Sequencing's Later line now points to it. No change to the active Goal 1–3 cascade or
+  Goal 3's gate — Later stays Later until Goal 3 passes.
+- 2026-08-06 v2 — Added Goal 4 (color grading foundation, `DAVINCI_PARITY.md` Phase 1),
+  cascaded via `/northstar` on explicit user instruction ("execute," immediately after
+  reviewing the phased roadmap) — a deliberate, recorded override of the Goal-3-gate
+  this document itself states, scoped to Phase 1 only. Removed "node-based color
+  grading" from the Non-goals list (now in scope via Goal 4); added an explicit
+  MVP-boundary exception note rather than quietly redefining what MVP means. Also fixed
+  a document-integrity gap found while refreshing: Goal 2's sub-goal 2b was still marked
+  `[ ]` with stale mid-progress detail text, even though Goal 2's own top-level status
+  had already recorded it done — checkbox and detail now match the real final state
+  (handler-extraction + `run.ts` real-Action dispatch, verified).
+- 2026-08-06 v2.1 — Goal 4a done: `COLOR_GRADING_DESIGN.md` audits Phase 1 against both
+  `apps/web` (grade state fits the existing effects Action pattern, no new Action types
+  needed for wheels/curves/qualifiers/LUTs) and the previously-unexamined `rust/`
+  engine source (the real prerequisite: generalizing a hardcoded uniform-packing
+  function before any new shader beyond blur can exist). Also found and documented in
+  `HEADLESS_DESIGN.md` v1.6: native Rust `wgpu` has real GPU access on this machine,
+  unaffected by the browser/Bun WebGPU gap blocking Goal 2's rendering — a fourth,
+  empirically-verified fix path for that separate blocker.

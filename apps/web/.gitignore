@@ -12,3 +12,7 @@
 next-env.d.ts
 
 *.tsbuildinfo
+
+# default headless-runner data dir (see HEADLESS_DESIGN.md), only used
+# locally when OPENCUT_HEADLESS_DATA_DIR isn't set
+.opencut-headless-data/

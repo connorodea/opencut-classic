@@ -2,7 +2,9 @@ import {
 	IndexedDBAdapter,
 	deleteDatabase,
 } from "@/services/storage/indexeddb-adapter";
-import type { MediaAssetData } from "@/services/storage/types";
+import { FileSystemAdapter } from "@/services/storage/filesystem-adapter";
+import { isBrowserStorageAvailable } from "@/services/storage/headless-paths";
+import type { StorageAdapter, MediaAssetData } from "@/services/storage/types";
 import { StorageMigration, type StorageMigrationRunArgs } from "./base";
 import type { MigrationResult, ProjectRecord } from "./transformers/types";
 import {
@@ -121,20 +123,25 @@ async function loadLegacyTracksForScene({
 	const sceneDbName = `video-editor-timelines-${projectId}-${sceneId}`;
 	const projectDbName = `video-editor-timelines-${projectId}`;
 
-	const adapter = new IndexedDBAdapter<LegacyTimelineData>(
-		sceneDbName,
-		"timeline",
-		1,
-	);
+	const adapter: StorageAdapter<LegacyTimelineData> = isBrowserStorageAvailable()
+		? new IndexedDBAdapter<LegacyTimelineData>({
+				dbName: sceneDbName,
+				storeName: "timeline",
+				version: 1,
+			})
+		: new FileSystemAdapter<LegacyTimelineData>(sceneDbName);
 
 	let data = await adapter.get("timeline");
 
 	if (!data && isMain) {
-		const projectAdapter = new IndexedDBAdapter<LegacyTimelineData>(
-			projectDbName,
-			"timeline",
-			1,
-		);
+		const projectAdapter: StorageAdapter<LegacyTimelineData> =
+			isBrowserStorageAvailable()
+				? new IndexedDBAdapter<LegacyTimelineData>({
+						dbName: projectDbName,
+						storeName: "timeline",
+						version: 1,
+					})
+				: new FileSystemAdapter<LegacyTimelineData>(projectDbName);
 		data = await projectAdapter.get("timeline");
 	}
 
@@ -157,11 +164,16 @@ async function loadMediaTypesById({
 		return {};
 	}
 
-	const mediaMetadataAdapter = new IndexedDBAdapter<MediaAssetData>(
-		`video-editor-media-${projectId}`,
-		"media-metadata",
-		1,
-	);
+	const mediaMetadataAdapter: StorageAdapter<MediaAssetData> =
+		isBrowserStorageAvailable()
+			? new IndexedDBAdapter<MediaAssetData>({
+					dbName: `video-editor-media-${projectId}`,
+					storeName: "media-metadata",
+					version: 1,
+				})
+			: new FileSystemAdapter<MediaAssetData>(
+					`media-metadata-${projectId}`,
+				);
 
 	const mediaEntries = await Promise.all(
 		mediaIds.map(async (mediaId) => {
@@ -232,6 +244,12 @@ async function deleteLegacyTimelineDbs({
 	projectId: string;
 	project: ProjectRecord;
 }): Promise<void> {
+	if (!isBrowserStorageAvailable()) {
+		// FileSystemAdapter stores are just directories under the headless
+		// data dir; there's no separate "database" to delete the way
+		// IndexedDB has one per dbName, so there's nothing to clean up here.
+		return;
+	}
 	const dbNames = getLegacyTimelineDbNames({ projectId, project });
 	await Promise.all(dbNames.map((dbName) => deleteDatabase({ dbName })));
 }

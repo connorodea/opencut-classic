@@ -75,7 +75,9 @@ jobs:
         working-directory: apps/web
         run: bun run build
 
-      - name: Run tests
+      - name: Run Bun tests
         working-directory: apps/web
-        run: echo "No tests implemented yet"
-        continue-on-error: true
+        run: bun test
+
+      - name: Run Rust tests
+        run: cargo test --workspace
